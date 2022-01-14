@@ -14,9 +14,11 @@ VER = 0.1.0
 PRG = cuss
 
 SRCS = \
+       src/cpu.c \
        src/cuss.c \
        src/errors.c \
        src/memory.c \
+       src/ops.c \
 
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)

@@ -8,11 +8,13 @@
 
 #include "errors.h"
 
-#define CUSS_MEMSIZE (1 << 20)
-
-extern uint8_t cuss_mem[];
-
 extern bool CussInitMemFromFile(const char* restrict file,
+  CuError* restrict err);
+
+extern bool CussByteAt(uint32_t addr, uint8_t* restrict val,
+  CuError* restrict err);
+
+extern bool CussWordAt(uint32_t addr, uint32_t* restrict val,
   CuError* restrict err);
 
 #endif  // CUSS_MEMORY_INCLUDED

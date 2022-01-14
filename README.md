@@ -2,10 +2,20 @@
 
 ## Introduction
 
-See the INSTALL.md file for instructions on building and installing CUSS.
+CUSS is a simulator for the Completely Useless System (CUS) based on the
+Completely Useless Processor (CUP).
+
+To run CUSS after initializing the contents of its memory using a memory-image
+file named `foo.mem`, execute:
+
+```shell
+$ cuss foo.mem
+```
+
+See the [INSTALL.md] file for instructions on building and installing CUSS.
 
 CUSS is licensed under the terms of the three-clause BSD license. See the
-LICENSE file for more details.
+[LICENSE] file for more details.
 
 ## Memory-Image
 
@@ -27,5 +37,10 @@ $ cat test.txt
 $ xxd -r test.txt test.mem
 ```
 
-This creates a memory-image to load the given eight bytes at the memory-address
-`0x00000000` and another four bytes at `0x00000100`.
+This creates a memory-image file `test.mem` that tells CUSS to load the given
+eight bytes (`de ad be ef ca fe ba be` in hexadecimal) at the memory-address
+`0x00000000` and another four bytes (`c0 de 65 02`) at the memory-address
+`0x00000100`.
+
+WARNING: These are *not* valid instructions for CUP at the moment. The example
+above is purely for illustrative purposes.
