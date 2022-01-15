@@ -107,10 +107,9 @@ bool CussExecNextInsn(CuError* restrict err) {
     if (!NextInsn(&insn, err)) {
         return false;
     }
-    cup_pc += sizeof(uint32_t);
-    
+
     uint8_t op0 = (uint8_t)(((insn & 0xFC000000U) >> 26) & 0x0000003FU);
-    if (!cup_op_executors[op0](op0, err)) {
+    if (!cup_op_executors[op0](insn, err)) {
         return false;
     }
     return true;

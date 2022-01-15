@@ -15,19 +15,22 @@ SDL2_LIBS = -L/usr/lib -Wl,-rpath,/usr/lib -Wl,--enable-new-dtags -lSDL2
 CC = cc
 
 # Which checks to perform on the source-code.
-CHK_FLAGS = -std=c99 -Wall -Wextra -Wpedantic -Werror -pedantic-errors
+WRN_FLAGS = -std=c99 -Wall -Wextra -Wpedantic
 
 # How much to optimize the generated code.
-OPT_FLAGS = -DNDEBUG -O2 -g1
+OPT_FLAGS = -DNDEBUG -O3
 
 # How to instruct the compiler to generate a make-compliant ".d" dependency-
 # file as the side-effect of compiling a ".c" file.
 #
 # WARNING: This only works with GCC and compilers that emulate its flags.
-DEP_FLAGS = -MT $(<:.c=.o) -MMD -MP
+MAK_FLAGS = -MT $(<:.c=.o) -MMD -MP
+
+# Additional flags per source-file useful during development.
+DEV_FLAGS = $(MAK_FLAGS) -g1 -Werror -pedantic-errors
 
 # Which flags to pass to the C compiler.
-CFLAGS = $(INCS) $(CHK_FLAGS) $(OPT_FLAGS)
+CFLAGS = $(INCS) $(WRN_FLAGS) $(OPT_FLAGS)
 
 # Which flags to pass to the linker-wrapper.
 LDFLAGS =
@@ -40,7 +43,7 @@ MK_DEPEND_MK = sort -u $(DEPS) | sed 's/^[ \t]*$$//' | sed '/^$$/d' > depend.mk
 
 # How to create an object-file from source-code.
 .c.o:
-	$(CC) $(CFLAGS) $(DEP_FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DEV_FLAGS) -c $< -o $@
 
 # How to remove a file without complaining about missing files.
 RM_Q = rm -f
