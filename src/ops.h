@@ -9,6 +9,7 @@
 #include "errors.h"
 
 extern void CussInitOps(void);
-extern bool CussExecuteOp(uint32_t insn, CuError* restrict err);
+
+extern bool CussExecuteOp(uint32_t pc, uint32_t insn, CuError* restrict err);
 
 #endif  // CUSS_OPS_INCLUDED

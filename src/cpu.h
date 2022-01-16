@@ -4,10 +4,20 @@
 #define CUSS_CPU_INCLUDED
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "errors.h"
 
 extern void CussInitCpu(void);
+
+extern bool CussGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
+  CuError* restrict err);
+
+extern bool CussSetIntRegister(uint8_t r_n, uint32_t r_val,
+  CuError* restrict err);
+
+extern uint32_t CussGetProgramCounter(void);
+extern bool CussSetProgramCounter(uint32_t pc, CuError* restrict err);
 
 extern bool CussExecNextInsn(CuError* restrict err);
 

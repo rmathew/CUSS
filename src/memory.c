@@ -17,24 +17,33 @@ static inline uint32_t LeQuadBytesToUint32(const uint8_t* bytes) {
       ((uint32_t)(bytes[2]) << 16) | ((uint32_t)(bytes[3]) << 24);
 }
 
-bool CussByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
+bool CussIsValidPhyMemAddr(uint32_t addr, CuError* restrict err) {
     if (addr >= CUSS_MEMSIZE) {
-        return CuErrMsg(err, "Invalid memory-address (0x%08" PRIx32 ").", addr);
+        return CuErrMsg(err, "Bad memory-address (0x%08" PRIx32 ").", addr);
+    }
+    return true;
+}
+
+bool CussByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
+    if (!CussIsValidPhyMemAddr(addr, err)) {
+        return false;
     }
     if (val == NULL) {
         return CuErrMsg(err, "NULL fetch-location.");
     }
+    // TODO: Maybe check for unaligned memory-access.
     *val = cuss_mem[addr];
     return true;
 }
 
 bool CussWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
-    if (addr >= CUSS_MEMSIZE - 4) {
-        return CuErrMsg(err, "Invalid memory-address (0x%08" PRIx32 ").", addr);
+    if (!CussIsValidPhyMemAddr(addr, err)) {
+        return false;
     }
     if (val == NULL) {
         return CuErrMsg(err, "NULL fetch-location.");
     }
+    // TODO: Maybe check for unaligned memory-access.
     *val = LeQuadBytesToUint32(cuss_mem + addr);
     return true;
 }
@@ -71,7 +80,7 @@ bool CussInitMemFromFile(const char* restrict file, CuError* restrict err) {
         uint32_t nbytes = LeQuadBytesToUint32(header + 4);
 
         // TODO: Handle overflows.
-        if (base + nbytes >= CUSS_MEMSIZE) {
+        if (!CussIsValidPhyMemAddr(base + nbytes, err)) {
             return CuErrMsg(err,
               "Out of bounds (base=0x%08" PRIx32 " + nbytes=0x%08" PRIx32
               " > 0x%08" PRIx32 ").", base, nbytes, CUSS_MEMSIZE);
