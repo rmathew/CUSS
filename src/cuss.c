@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         getchar();
 
         if (!CussExecNextInsn(&err)) {
-            fprintf(stderr, "ERROR: Could not execute instruction: %s\n",
+            fprintf(stderr, "ERROR: Execution-fault: %s\n",
               err.err_msg);
             return EXIT_FAILURE;
         }
