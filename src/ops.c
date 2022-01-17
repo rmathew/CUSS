@@ -21,11 +21,30 @@
 #define GET_RS0(insn) (uint8_t)(((insn & 0x001F0000U) >> 16) & 0x0000001FU)
 #define GET_RS1(insn) (uint8_t)(((insn & 0x0000F800U) >> 11) & 0x0000001FU)
 
+// Extract the `shamt` field from an instruction.
+#define GET_SHAMT(insn) (uint8_t)(((insn & 0x000007C0U) >> 6) & 0x0000001FU)
+
+// Extract the `imm16` field from an instruction.
+#define GET_IMM16(insn) (insn & 0x0000FFFFU)
+
+// Extract the `imm21` field from an instruction.
+#define GET_IMM21(insn) (insn & 0x001FFFFFU)
+
+// Extract the `imm26` field from an instruction.
+#define GET_IMM26(insn) (insn & 0x03FFFFFFU)
+
 // The type of a function to which the execution of a given instruction is
 // delegated using the dispatcher-table `cup_op_executors` below.
 typedef bool (*CuOpExecutor)(uint32_t, uint32_t, CuError* restrict);
 
 static CuOpExecutor cup_op_executors[NUM_OP0S];
+
+static void SetCpuIntegerFlags(uint64_t res) {
+    const bool negative = (res & 0x0000000080000000U) > 0;
+    const bool overflow = (res & 0xFFFFFFFF00000000U) > 0;
+    const bool carry = (res & 0x0000000100000000U) > 0;
+    CuSetIntegerFlags(negative, overflow, carry, (res == 0));
+}
 
 static bool CuExecuteBadOp0xNN(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
@@ -33,21 +52,27 @@ static bool CuExecuteBadOp0xNN(uint32_t pc, uint32_t insn,
     return CuErrMsg(err,
       "Bad instruction (op0=%02" PRIx8 " at pc=%08" PRIx32 ").", op0, pc);
 }
-    
-// op0 = 0x00: an R-type instruction for the ALU.
-static bool CuExecuteOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
-    uint32_t new_pc = pc + sizeof(uint32_t);
 
+// op0 = 0x00: an R-type container of many instructions.
+static bool CuExecuteOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
     const uint8_t rt_num = GET_RT(insn);
-    const uint8_t rs0_num = GET_RS0(insn);
-    const uint8_t rs1_num = GET_RS1(insn);
+    uint32_t rs0_val;
+    if (!CuGetIntRegister(GET_RS0(insn), &rs0_val, err)) {
+        return false;
+    }
+    uint32_t rs1_val;
+    if (!CuGetIntRegister(GET_RS1(insn), &rs1_val, err)) {
+        return false;
+    }
+    uint32_t new_pc = pc + sizeof(uint32_t);
+    uint64_t ext_prec_val;
 
     const uint8_t op1 = GET_OP1(insn);
     switch (op1) {
       case 0x00:
-      case 0x01:
-        // SHLR (0x00): Shift left logically using the `rs1` register-operand.
-        // SLRF (0x01): The same as SHLR, but sets the integer condition-flags.
+      case 0x01: {
+        // SLLR (0x00): Shift left logically using the `rs1` register-operand.
+        // SLRF (0x01): The same as SLLR, but sets the integer condition-flags.
         //
         // NOTE: The advantage of using op0=0x00 and op1=0x00 for the SHLR
         // instruction is that an all-zero bits instruction represents:
@@ -59,45 +84,219 @@ static bool CuExecuteOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         if (insn == 0x00000000U) {
             break;
         }
-
-        uint32_t rs1_val;
-        if (!CussGetIntRegister(rs1_num, &rs1_val, err)) {
-            return false;
-        }
         // Only consider bits 0-4 - there are only 32 bits in a register.
         rs1_val &= 0x000000001FU;
-
-        uint32_t rs0_val;
-        if (!CussGetIntRegister(rs0_num, &rs0_val, err)) {
+        ext_prec_val = (uint64_t)rs0_val << rs1_val;
+        if (!CuSetIntRegister(rt_num, (uint32_t)(ext_prec_val & 0xFFFFFFFFU),
+          err)) {
             return false;
         }
-
-        const uint32_t tmp_val = rs0_val << rs1_val;
-        if (!CussSetIntRegister(rt_num, tmp_val, err)) {
-            return false;
+        if (op1 == 0x01) {
+            SetCpuIntegerFlags(ext_prec_val);
         }
-
-        // TODO: Implement setting integer condition-flags for SLRF.
         break;
+      }
 
-      default:
-        return CuErrMsg(err, "Illegal instruction (op0=%02" PRIx8 ", op1=%02"
-          PRIx8 ").", 0x00, op1);
+      case 0x02:
+      case 0x03:
+      case 0x04:
+      case 0x05: {
+        // SRLR (0x02): Shift right logically using the `rs1` register-operand.
+        // SRRF (0x03): The same as SRLR, but sets the integer condition-flags.
+        // SRAR (0x04): Shift right arithmetic using the `rs1` register-operand.
+        // SRAS (0x05): The same as SRAR, but sets the integer condition-flags.
+
+        // Only consider bits 0-4 - there are only 32 bits in a register.
+        rs1_val &= 0x000000001FU;
+        ext_prec_val = (uint64_t)rs0_val >> rs1_val;
+        // NOTE: Right shifts for unsigned types in C99 are logical shifts.
+        // We therefore need to manually propagate the sign-bit.
+        if ((op1 == 0x04 || op1 == 0x05) && (rs0_val & 0x80000000U)) {
+            // A string of `rs1_val` 1s in the LSB.
+            uint64_t mask = (1 << rs1_val) - 1;
+            mask <<= (32 - rs1_val);
+            ext_prec_val |= mask;
+        }
+        if (!CuSetIntRegister(rt_num, (uint32_t)(ext_prec_val & 0xFFFFFFFFU),
+          err)) {
+            return false;
+        }
+        if (op1 == 0x03 || op1 == 0x05) {
+            SetCpuIntegerFlags(ext_prec_val);
+        }
+        break;
+      }
+
+      case 0x06:
+      case 0x07: {
+        // SLLI (0x06): Shift left logically using the `shamt` immediate value.
+        // SLIF (0x07): The same as SLLI, but sets the integer condition-flags.
+        ext_prec_val = (uint64_t)rs0_val << GET_SHAMT(insn);
+        if (!CuSetIntRegister(rt_num, (uint32_t)(ext_prec_val & 0xFFFFFFFFU),
+          err)) {
+            return false;
+        }
+        if (op1 == 0x07) {
+            SetCpuIntegerFlags(ext_prec_val);
+        }
+        break;
+      }
+
+      case 0x08:
+      case 0x09:
+      case 0x0a:
+      case 0x0b: {
+        // SRLI (0x08): Shift right logically using the `shamt` immediate value.
+        // SRIF (0x09): The same as SRLI, but sets the integer condition-flags.
+        // SRAI (0x0a): Shift right arithmetic with the `shamt` immediate value.
+        // SRAJ (0x0b): The same as SRAI, but sets the integer condition-flags.
+        const uint8_t shamt = GET_SHAMT(insn);
+        ext_prec_val = (uint64_t)rs0_val >> shamt;
+        // NOTE: Right shifts for unsigned types in C99 are logical shifts.
+        // We therefore need to manually propagate the sign-bit.
+        if ((op1 == 0x0a || op1 == 0x0b) && (rs0_val & 0x80000000U)) {
+            // A string of `shamt` 1s in the LSB.
+            uint64_t mask = (1 << shamt) - 1;
+            mask <<= (32 - shamt);
+            ext_prec_val |= mask;
+        }
+        if (!CuSetIntRegister(rt_num, (uint32_t)(ext_prec_val & 0xFFFFFFFFU),
+          err)) {
+            return false;
+        }
+        if (op1 == 0x09 || op1 == 0x0b) {
+            SetCpuIntegerFlags(ext_prec_val);
+        }
+        break;
+      }
+
+      case 0x0c:
+      case 0x0d: {
+        // ANDR (0x0c): Bit-wise AND of `rs0` and `rs1` operands.
+        // ADRF (0x0d): The same as ANDR, but sets the integer condition-flags.
+        const uint32_t res = rs0_val & rs1_val;
+        if (!CuSetIntRegister(rt_num, res, err)) {
+            return false;
+        }
+        if (op1 == 0x0d) {
+            SetCpuIntegerFlags(res);
+        }
+        break;
+      }
+
+      case 0x0e:
+      case 0x0f: {
+        // ORRR (0x0e): Bit-wise OR of `rs0` and `rs1` operands.
+        // ORRF (0x0f): The same as ORRR, but sets the integer condition-flags.
+        const uint32_t res = rs0_val | rs1_val;
+        if (!CuSetIntRegister(rt_num, res, err)) {
+            return false;
+        }
+        if (op1 == 0x0f) {
+            SetCpuIntegerFlags(res);
+        }
+        break;
+      }
+
+      case 0x10:
+      case 0x11: {
+        // NOTR (0x10): Bit-wise NOT of `rs0` (`rs1` is ignored).
+        // NOTF (0x11): The same as NOTR, but sets the integer condition-flags.
+        const uint32_t res = ~rs0_val;
+        if (!CuSetIntRegister(rt_num, res, err)) {
+            return false;
+        }
+        if (op1 == 0x11) {
+            SetCpuIntegerFlags(res);
+        }
+        break;
+      }
+
+      case 0x12:
+      case 0x13: {
+        // XORR (0x12): Bit-wise XOR of `rs0` and `rs1` operands.
+        // XORF (0x13): The same as XORR, but sets the integer condition-flags.
+        const uint32_t res = rs0_val ^ rs1_val;
+        if (!CuSetIntRegister(rt_num, res, err)) {
+            return false;
+        }
+        if (op1 == 0x13) {
+            SetCpuIntegerFlags(res);
+        }
+        break;
+      }
+
+      default: {
+        return CuErrMsg(err, "Bad instruction (op0=%02" PRIx8 ", op1=%02" PRIx8
+          " at pc=%08" PRIx32 ").", 0x00, op1, pc);
+      }
     }
 
-    if (!CussSetProgramCounter(new_pc, err)) {
+    if (!CuSetProgramCounter(new_pc, err)) {
         return false;
     }
     return true;
 }
 
-void CussInitOps(void) {
+// ANDI: Bit-wise AND with a zero-extended 16-bit immediate value.
+static bool CuExecuteOp0x01(uint32_t pc, uint32_t insn, CuError* restrict err) {
+    const uint8_t rt_num = GET_RT(insn);
+    uint32_t rs0_val;
+    if (!CuGetIntRegister(GET_RS0(insn), &rs0_val, err)) {
+        return false;
+    }
+    const uint32_t imm16 = GET_IMM16(insn);
+    if (!CuSetIntRegister(rt_num, rs0_val & imm16, err)) {
+        return false;
+    }
+    if (!CuSetProgramCounter(pc + sizeof(uint32_t), err)) {
+        return false;
+    }
+    return true;
+}
+
+// ORRI: Bit-wise OR with a zero-extended 16-bit immediate value.
+static bool CuExecuteOp0x02(uint32_t pc, uint32_t insn, CuError* restrict err) {
+    const uint8_t rt_num = GET_RT(insn);
+    uint32_t rs0_val;
+    if (!CuGetIntRegister(GET_RS0(insn), &rs0_val, err)) {
+        return false;
+    }
+    const uint32_t imm16 = GET_IMM16(insn);
+    if (!CuSetIntRegister(rt_num, rs0_val | imm16, err)) {
+        return false;
+    }
+    if (!CuSetProgramCounter(pc + sizeof(uint32_t), err)) {
+        return false;
+    }
+    return true;
+}
+
+// XORI: Bit-wise XOR with a zero-extended 16-bit immediate value.
+static bool CuExecuteOp0x03(uint32_t pc, uint32_t insn, CuError* restrict err) {
+    const uint8_t rt_num = GET_RT(insn);
+    uint32_t rs0_val;
+    if (!CuGetIntRegister(GET_RS0(insn), &rs0_val, err)) {
+        return false;
+    }
+    const uint32_t imm16 = GET_IMM16(insn);
+    if (!CuSetIntRegister(rt_num, rs0_val ^ imm16, err)) {
+        return false;
+    }
+    if (!CuSetProgramCounter(pc + sizeof(uint32_t), err)) {
+        return false;
+    }
+    return true;
+}
+
+void CuInitOps(void) {
     cup_op_executors[0x00] = CuExecuteOp0x00;
 
+    cup_op_executors[0x01] = CuExecuteOp0x01;
+    cup_op_executors[0x02] = CuExecuteOp0x02;
+    cup_op_executors[0x03] = CuExecuteOp0x03;
+
     // TODO: Define and implement the rest of the ISA.
-    cup_op_executors[0x01] = CuExecuteBadOp0xNN;
-    cup_op_executors[0x02] = CuExecuteBadOp0xNN;
-    cup_op_executors[0x03] = CuExecuteBadOp0xNN;
     cup_op_executors[0x04] = CuExecuteBadOp0xNN;
     cup_op_executors[0x05] = CuExecuteBadOp0xNN;
     cup_op_executors[0x06] = CuExecuteBadOp0xNN;
@@ -160,7 +359,7 @@ void CussInitOps(void) {
     cup_op_executors[0x3f] = CuExecuteBadOp0xNN;
 }
 
-bool CussExecuteOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
+bool CuExecuteOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
     const uint8_t op0 = GET_OP0(insn);
     if (!cup_op_executors[op0](pc, insn, err)) {
         return false;

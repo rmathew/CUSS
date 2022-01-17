@@ -16,16 +16,16 @@ int main(int argc, char *argv[]) {
 
     CuError err;
     printf("INFO: Loading memory-image from file '%s'...\n", argv[1]);
-    if (!CussInitMemFromFile(argv[1], &err)) {
+    if (!CuInitMemFromFile(argv[1], &err)) {
         fprintf(stderr, "ERROR: Could not load '%s': %s\n", argv[1],
           err.err_msg);
         return EXIT_FAILURE;
     }
 
-    CussInitCpu();
+    CuInitCpu();
     do {
         putchar('\n');
-        if (!CussPrintCpuState(&err)) {
+        if (!CuPrintCpuState(&err)) {
             fprintf(stderr, "ERROR: Could not print CPU-state: %s\n",
               err.err_msg);
             return EXIT_FAILURE;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         fflush(stdout);
         getchar();
 
-        if (!CussExecNextInsn(&err)) {
+        if (!CuExecNextInsn(&err)) {
             fprintf(stderr, "ERROR: Execution-fault: %s\n",
               err.err_msg);
             return EXIT_FAILURE;

@@ -8,19 +8,25 @@
 
 #include "errors.h"
 
-extern void CussInitCpu(void);
+extern void CuInitCpu(void);
 
-extern bool CussGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
+extern bool CuGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
+  CuError* restrict err);
+extern bool CuSetIntRegister(uint8_t r_n, uint32_t r_val,
   CuError* restrict err);
 
-extern bool CussSetIntRegister(uint8_t r_n, uint32_t r_val,
-  CuError* restrict err);
+extern uint32_t CuGetProgramCounter(void);
+extern bool CuSetProgramCounter(uint32_t pc, CuError* restrict err);
 
-extern uint32_t CussGetProgramCounter(void);
-extern bool CussSetProgramCounter(uint32_t pc, CuError* restrict err);
+extern bool CuIsNegativeFlagSet(void);
+extern bool CuIsOverflowFlagSet(void);
+extern bool CuIsCarryFlagSet(void);
+extern bool CuIsZeroFlagSet(void);
+extern void CuSetIntegerFlags(bool negative, bool overflow, bool carry,
+  bool zero);
 
-extern bool CussExecNextInsn(CuError* restrict err);
+extern bool CuExecNextInsn(CuError* restrict err);
 
-extern bool CussPrintCpuState(CuError* restrict err);
+extern bool CuPrintCpuState(CuError* restrict err);
 
 #endif  // CUSS_CPU_INCLUDED

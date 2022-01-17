@@ -21,24 +21,27 @@ static uint32_t cup_iregs[NUM_IREGS];
 // The program-counter of a CUP core.
 static uint32_t cup_pc;
 
+// The processor state register of a CUP core.
+static uint32_t cup_psr;
+
 static inline bool NextInsn(uint32_t* restrict insn, CuError* restrict err) {
     CuError nerr;
-    if (!CussWordAt(cup_pc, insn, &nerr)) {
+    if (!CuWordAt(cup_pc, insn, &nerr)) {
         return CuErrMsg(err, "Error reading instruction: %s", nerr.err_msg);
     }
     return true;
 }
 
-void CussInitCpu(void) {
+void CuInitCpu(void) {
     cup_pc = RESET_VECTOR;
     cup_iregs[0] = 0x00000000U;
     for (int i = 1; i < NUM_IREGS; i++) {
         cup_iregs[i] = DEF_REG_VAL;
     }
-    CussInitOps();
+    CuInitOps();
 }
 
-bool CussGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
+bool CuGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
   CuError* restrict err) {
     if (r_n >= NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
@@ -47,7 +50,7 @@ bool CussGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
     return true;
 }
 
-bool CussSetIntRegister(uint8_t r_n, uint32_t r_val,
+bool CuSetIntRegister(uint8_t r_n, uint32_t r_val,
   CuError* restrict err) {
     if (r_n >= NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
@@ -58,12 +61,12 @@ bool CussSetIntRegister(uint8_t r_n, uint32_t r_val,
     return true;
 }
 
-uint32_t CussGetProgramCounter(void) {
+uint32_t CuGetProgramCounter(void) {
     return cup_pc;
 }
 
-bool CussSetProgramCounter(uint32_t pc, CuError* restrict err) {
-    if (!CussIsValidPhyMemAddr(pc, err)) {
+bool CuSetProgramCounter(uint32_t pc, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(pc, err)) {
         return false;
     }
     if (pc & 0x00000003U) {
@@ -73,19 +76,51 @@ bool CussSetProgramCounter(uint32_t pc, CuError* restrict err) {
     return true;
 }
 
-bool CussExecNextInsn(CuError* restrict err) {
+bool CuIsNegativeFlagSet(void) {
+    return (cup_psr & 0x00000008U) > 0;
+}
+
+bool CuIsOverflowFlagSet(void) {
+    return (cup_psr & 0x00000004U) > 0;
+}
+
+bool CuIsCarryFlagSet(void) {
+    return (cup_psr & 0x00000002U) > 0;
+}
+
+bool CuIsZeroFlagSet(void) {
+    return (cup_psr & 0x00000001U) > 0;
+}
+
+void CuSetIntegerFlags(bool negative, bool overflow, bool carry,
+  bool zero) {
+    if (negative) {
+        cup_psr |= 0x00000008U;
+    }
+    if (overflow) {
+        cup_psr |= 0x00000004U;
+    }
+    if (carry) {
+        cup_psr |= 0x00000002U;
+    }
+    if (zero) {
+        cup_psr |= 0x00000001U;
+    }
+}
+
+bool CuExecNextInsn(CuError* restrict err) {
     uint32_t insn;
     if (!NextInsn(&insn, err)) {
         return false;
     }
 
-    if (!CussExecuteOp(cup_pc, insn, err)) {
+    if (!CuExecuteOp(cup_pc, insn, err)) {
         return false;
     }
     return true;
 }
 
-bool CussPrintCpuState(CuError* restrict err) {
+bool CuPrintCpuState(CuError* restrict err) {
     uint32_t insn;
     if (!NextInsn(&insn, err)) {
         return false;

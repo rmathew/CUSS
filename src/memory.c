@@ -17,15 +17,15 @@ static inline uint32_t LeQuadBytesToUint32(const uint8_t* bytes) {
       ((uint32_t)(bytes[2]) << 16) | ((uint32_t)(bytes[3]) << 24);
 }
 
-bool CussIsValidPhyMemAddr(uint32_t addr, CuError* restrict err) {
+bool CuIsValidPhyMemAddr(uint32_t addr, CuError* restrict err) {
     if (addr >= CUSS_MEMSIZE) {
         return CuErrMsg(err, "Bad memory-address (0x%08" PRIx32 ").", addr);
     }
     return true;
 }
 
-bool CussByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
-    if (!CussIsValidPhyMemAddr(addr, err)) {
+bool CuByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err)) {
         return false;
     }
     if (val == NULL) {
@@ -36,8 +36,8 @@ bool CussByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
     return true;
 }
 
-bool CussWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
-    if (!CussIsValidPhyMemAddr(addr, err)) {
+bool CuWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err)) {
         return false;
     }
     if (val == NULL) {
@@ -48,7 +48,7 @@ bool CussWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
     return true;
 }
 
-bool CussInitMemFromFile(const char* restrict file, CuError* restrict err) {
+bool CuInitMemFromFile(const char* restrict file, CuError* restrict err) {
     if (file == NULL) {
         return CuErrMsg(err, "Missing file-name.");
     }
@@ -80,7 +80,7 @@ bool CussInitMemFromFile(const char* restrict file, CuError* restrict err) {
         uint32_t nbytes = LeQuadBytesToUint32(header + 4);
 
         // TODO: Handle overflows.
-        if (!CussIsValidPhyMemAddr(base + nbytes, err)) {
+        if (!CuIsValidPhyMemAddr(base + nbytes, err)) {
             return CuErrMsg(err,
               "Out of bounds (base=0x%08" PRIx32 " + nbytes=0x%08" PRIx32
               " > 0x%08" PRIx32 ").", base, nbytes, CUSS_MEMSIZE);

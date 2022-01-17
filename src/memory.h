@@ -8,15 +8,14 @@
 
 #include "errors.h"
 
-extern bool CussIsValidPhyMemAddr(uint32_t addr, CuError* restrict err);
+extern bool CuIsValidPhyMemAddr(uint32_t addr, CuError* restrict err);
 
-extern bool CussByteAt(uint32_t addr, uint8_t* restrict val,
+extern bool CuByteAt(uint32_t addr, uint8_t* restrict val,
   CuError* restrict err);
 
-extern bool CussWordAt(uint32_t addr, uint32_t* restrict val,
+extern bool CuWordAt(uint32_t addr, uint32_t* restrict val,
   CuError* restrict err);
 
-extern bool CussInitMemFromFile(const char* restrict file,
-  CuError* restrict err);
+extern bool CuInitMemFromFile(const char* restrict file, CuError* restrict err);
 
 #endif  // CUSS_MEMORY_INCLUDED
