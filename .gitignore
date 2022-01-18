@@ -1,0 +1,8 @@
+# Ignore-patterns specific to this Git repository. For object-files, temporary
+# editor files, etc. use a suitable alternative (see `git help ignore`).
+
+# Ignore the Make dependency-files.
+**/*.d
+
+# Ignore the binaries created during the in-tree build.
+/cuss

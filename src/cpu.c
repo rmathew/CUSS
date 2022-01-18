@@ -18,6 +18,9 @@
 // The general-purpose integer registers in a CUP core.
 static uint32_t cup_iregs[NUM_IREGS];
 
+// An additional register to provide extended precision during multiply/divide.
+static uint32_t cup_epr;
+
 // The program-counter of a CUP core.
 static uint32_t cup_pc;
 
@@ -38,11 +41,12 @@ void CuInitCpu(void) {
     for (int i = 1; i < NUM_IREGS; i++) {
         cup_iregs[i] = DEF_REG_VAL;
     }
+    cup_psr = 0x00000000U;
+    cup_epr = 0x00000000U;
     CuInitOps();
 }
 
-bool CuGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
-  CuError* restrict err) {
+bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val, CuError* restrict err) {
     if (r_n >= NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
     }
@@ -50,8 +54,7 @@ bool CuGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
     return true;
 }
 
-bool CuSetIntRegister(uint8_t r_n, uint32_t r_val,
-  CuError* restrict err) {
+bool CuSetIntReg(uint8_t r_n, uint32_t r_val, CuError* restrict err) {
     if (r_n >= NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
     }
@@ -61,11 +64,19 @@ bool CuSetIntRegister(uint8_t r_n, uint32_t r_val,
     return true;
 }
 
-uint32_t CuGetProgramCounter(void) {
+uint32_t CuGetExtPrecReg() {
+    return cup_epr;
+}
+
+void CuSetExtPrecReg(uint32_t r_val) {
+    cup_epr = r_val;
+}
+
+uint32_t CuGetProgCtr(void) {
     return cup_pc;
 }
 
-bool CuSetProgramCounter(uint32_t pc, CuError* restrict err) {
+bool CuSetProgCtr(uint32_t pc, CuError* restrict err) {
     if (!CuIsValidPhyMemAddr(pc, err)) {
         return false;
     }
@@ -76,34 +87,33 @@ bool CuSetProgramCounter(uint32_t pc, CuError* restrict err) {
     return true;
 }
 
-bool CuIsNegativeFlagSet(void) {
+bool CuIsNegFlagSet(void) {
     return (cup_psr & 0x00000008U) > 0;
 }
 
-bool CuIsOverflowFlagSet(void) {
+bool CuIsOvfFlagSet(void) {
     return (cup_psr & 0x00000004U) > 0;
 }
 
-bool CuIsCarryFlagSet(void) {
+bool CuIsCarFlagSet(void) {
     return (cup_psr & 0x00000002U) > 0;
 }
 
-bool CuIsZeroFlagSet(void) {
+bool CuIsZerFlagSet(void) {
     return (cup_psr & 0x00000001U) > 0;
 }
 
-void CuSetIntegerFlags(bool negative, bool overflow, bool carry,
-  bool zero) {
-    if (negative) {
+void CuSetIntFlags(bool neg, bool ovf, bool car, bool zer) {
+    if (neg) {
         cup_psr |= 0x00000008U;
     }
-    if (overflow) {
+    if (ovf) {
         cup_psr |= 0x00000004U;
     }
-    if (carry) {
+    if (car) {
         cup_psr |= 0x00000002U;
     }
-    if (zero) {
+    if (zer) {
         cup_psr |= 0x00000001U;
     }
 }
@@ -114,7 +124,7 @@ bool CuExecNextInsn(CuError* restrict err) {
         return false;
     }
 
-    if (!CuExecuteOp(cup_pc, insn, err)) {
+    if (!CuExecOp(cup_pc, insn, err)) {
         return false;
     }
     return true;

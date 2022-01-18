@@ -10,20 +10,21 @@
 
 extern void CuInitCpu(void);
 
-extern bool CuGetIntRegister(uint8_t r_n, uint32_t* restrict r_val,
+extern bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val,
   CuError* restrict err);
-extern bool CuSetIntRegister(uint8_t r_n, uint32_t r_val,
-  CuError* restrict err);
+extern bool CuSetIntReg(uint8_t r_n, uint32_t r_val, CuError* restrict err);
 
-extern uint32_t CuGetProgramCounter(void);
-extern bool CuSetProgramCounter(uint32_t pc, CuError* restrict err);
+extern uint32_t CuGetExtPrecReg();
+extern void CuSetExtPrecReg(uint32_t r_val);
 
-extern bool CuIsNegativeFlagSet(void);
-extern bool CuIsOverflowFlagSet(void);
-extern bool CuIsCarryFlagSet(void);
-extern bool CuIsZeroFlagSet(void);
-extern void CuSetIntegerFlags(bool negative, bool overflow, bool carry,
-  bool zero);
+extern uint32_t CuGetProgCtr(void);
+extern bool CuSetProgCtr(uint32_t pc, CuError* restrict err);
+
+extern bool CuIsNegFlagSet(void);
+extern bool CuIsOvfFlagSet(void);
+extern bool CuIsCarFlagSet(void);
+extern bool CuIsZerFlagSet(void);
+extern void CuSetIntFlags(bool neg, bool ovf, bool car, bool zer);
 
 extern bool CuExecNextInsn(CuError* restrict err);
 
