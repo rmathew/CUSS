@@ -33,6 +33,8 @@
 // Extract the `imm26` field from an instruction.
 #define GET_IMM26(insn) (insn & 0x03FFFFFFU)
 
+#define LINK_REG_NUM 31
+
 // The type of a function to which the execution of a given instruction is
 // delegated using the dispatcher-table `cup_op_executors` below.
 typedef bool (*CuOpExecutor)(uint32_t, uint32_t, CuError* restrict);
@@ -298,6 +300,30 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         break;
       }
 
+      case 0x1e:
+      case 0x1f: {
+        // JMPR (0x1e): Jump to the address `ra` + (`rb` << `shamt`).
+        // JALR (0x1f): Like JMPR above, but saves the return-address in `r31`.
+        ext_prec_val = rb_val;
+        if (ext_prec_val & 0x0000000080000000U) {
+            ext_prec_val |= 0xFFFFFFFF00000000U;
+        }
+        ext_prec_val <<= GET_SHAMT(insn);
+        ext_prec_val += ra_val;
+        if (ext_prec_val & 0x8000000000000000U) {
+            return CuErrMsg(err, "Negative jump-address.");
+        }
+        if (op1 == 0x1f) {
+            if (!CuSetIntReg(LINK_REG_NUM, pc + sizeof(uint32_t), err)) {
+                return false;
+            }
+        }
+        if (!CuSetProgCtr(ext_prec_val & 0x00000000FFFFFFFFU, err)) {
+            return false;
+        }
+        break;
+      }
+
       default: {
         return CuErrMsg(err, "Bad instruction (op0=%02" PRIx8 ", op1=%02" PRIx8
           " at pc=%08" PRIx32 ").", 0x00, op1, pc);
@@ -310,55 +336,30 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
     return true;
 }
 
-// ANDI: Bit-wise AND of `ra` with a zero-extended 16-bit immediate value.
-static bool CuExecOp0x01(uint32_t pc, uint32_t insn, CuError* restrict err) {
+// ANDI (0x01): Bit-wise AND of `ra` with a zero-extended 16-bit immediate.
+// ORRI (0x02): Bit-wise OR of `ra` with a zero-extended 16-bit immediate.
+// XORI (0x03): Bit-wise XOR of `ra` with a zero-extended 16-bit immediate.
+static bool CuExecOp0x01To03(uint32_t pc, uint32_t insn,
+  CuError* restrict err) {
     uint32_t ra_val;
     if (!CuGetIntReg(GET_RA(insn), &ra_val, err)) {
         return false;
     }
 
     uint64_t ext_prec_val = GET_IMM16(insn);
-    ext_prec_val &= ra_val;
-    if (!CuSetIntReg(GET_RT(insn), ext_prec_val & 0xFFFFFFFFU, err)) {
-        return false;
-    }
-    SetCpuIntFlags(ext_prec_val);
+    switch (GET_OP0(insn)) {
+      case 0x01:
+        ext_prec_val &= ra_val;
+        break;
 
-    if (!CuSetProgCtr(pc + sizeof(uint32_t), err)) {
-        return false;
-    }
-    return true;
-}
+      case 0x02:
+        ext_prec_val |= ra_val;
+        break;
 
-// ORRI: Bit-wise OR of `ra` with a zero-extended 16-bit immediate value.
-static bool CuExecOp0x02(uint32_t pc, uint32_t insn, CuError* restrict err) {
-    uint32_t ra_val;
-    if (!CuGetIntReg(GET_RA(insn), &ra_val, err)) {
-        return false;
+      case 0x03:
+        ext_prec_val ^= ra_val;
+        break;
     }
-
-    uint64_t ext_prec_val = GET_IMM16(insn);
-    ext_prec_val |= ra_val;
-    if (!CuSetIntReg(GET_RT(insn), ext_prec_val & 0xFFFFFFFFU, err)) {
-        return false;
-    }
-    SetCpuIntFlags(ext_prec_val);
-
-    if (!CuSetProgCtr(pc + sizeof(uint32_t), err)) {
-        return false;
-    }
-    return true;
-}
-
-// XORI: Bit-wise XOR of `ra` with a zero-extended 16-bit immediate value.
-static bool CuExecOp0x03(uint32_t pc, uint32_t insn, CuError* restrict err) {
-    uint32_t ra_val;
-    if (!CuGetIntReg(GET_RA(insn), &ra_val, err)) {
-        return false;
-    }
-
-    uint64_t ext_prec_val = GET_IMM16(insn);
-    ext_prec_val ^= ra_val;
     if (!CuSetIntReg(GET_RT(insn), ext_prec_val & 0xFFFFFFFFU, err)) {
         return false;
     }
@@ -393,23 +394,136 @@ static bool CuExecOp0x04(uint32_t pc, uint32_t insn, CuError* restrict err) {
     return true;
 }
 
+// JMPI (0x05): Jump to a PC-relative address using a sign-extended 26-bit
+// immediate value taken as a word-address (giving a 28-bit reach).
+// JALI (0x06): Like JMPI above, but saves the return-address in `r31`.
+static bool CuExecOp0x05To06(uint32_t pc, uint32_t insn,
+  CuError* restrict err) {
+    uint64_t ext_prec_val = GET_IMM26(insn);
+    if (ext_prec_val & 0x0000000004000000U) {
+        ext_prec_val |= 0xFFFFFFFFFC000000U;
+    }
+    ext_prec_val <<= 2;
+    ext_prec_val += pc;
+    if (ext_prec_val & 0x8000000000000000U) {
+        return CuErrMsg(err, "Negative jump-address.");
+    }
+    if (GET_OP0(insn) == 0x06) {
+        if (!CuSetIntReg(LINK_REG_NUM, pc + sizeof(uint32_t), err)) {
+            return false;
+        }
+    }
+    if (!CuSetProgCtr(ext_prec_val & 0x00000000FFFFFFFFU, err)) {
+        return false;
+    }
+    return true;
+}
+
+// BRNR (0x07): Jump to the address at `rt` + sign-extended `imm21` (taken as a
+// word-address) when the `negative` integer flag is set.
+// BROR (0x08): Like BRNR, but for the `overflow` flag.
+// BRCR (0x09): Like BRNR, but for the `carry` flag.
+// BRZR (0x0a): Like BRNR, but for the `zero` flag.
+static bool CuExecOp0x07To0a(uint32_t pc, uint32_t insn,
+  CuError* restrict err) {
+    uint32_t rt_val;
+    if (!CuGetIntReg(GET_RT(insn), &rt_val, err)) {
+        return false;
+    }
+    uint64_t ext_prec_val = GET_IMM21(insn);
+    if (ext_prec_val & 0x0000000000100000U) {
+        ext_prec_val |= 0xFFFFFFFFFFE00000U;
+    }
+    ext_prec_val <<= 2;
+    ext_prec_val += rt_val;
+    if (ext_prec_val & 0x8000000000000000U) {
+        return CuErrMsg(err, "Negative jump-address.");
+    }
+
+    bool flag_set = false;
+    switch (GET_OP0(insn)) {
+      case 0x07:
+        flag_set = CuIsNegFlagSet();
+        break;
+
+      case 0x08:
+        flag_set = CuIsOvfFlagSet();
+        break;
+
+      case 0x09:
+        flag_set = CuIsCarFlagSet();
+        break;
+
+      case 0x0a:
+        flag_set = CuIsZerFlagSet();
+        break;
+    }
+    const uint32_t new_pc = flag_set ?
+      (uint32_t)(ext_prec_val & 0x00000000FFFFFFFFU) : (pc + sizeof(uint32_t));
+    if (!CuSetProgCtr(new_pc, err)) {
+        return false;
+    }
+    return true;
+}
+
+// BRNE (0x0b): Jump to the PC-relative address at sign-extended `imm16` (taken
+// as a word-address) when `rt` == `ra`.
+// BRGT (0x0c): Like BRNE, but when `rt` > `ra`.
+static bool CuExecOp0x0bTo0c(uint32_t pc, uint32_t insn,
+  CuError* restrict err) {
+    uint32_t rt_val;
+    if (!CuGetIntReg(GET_RT(insn), &rt_val, err)) {
+        return false;
+    }
+    uint32_t ra_val;
+    if (!CuGetIntReg(GET_RA(insn), &ra_val, err)) {
+        return false;
+    }
+    uint64_t ext_prec_val = GET_IMM16(insn);
+    if (ext_prec_val & 0x0000000000008000U) {
+        ext_prec_val |= 0xFFFFFFFFFFFF0000U;
+    }
+    ext_prec_val <<= 2;
+    ext_prec_val += pc;
+    if (ext_prec_val & 0x8000000000000000U) {
+        return CuErrMsg(err, "Negative jump-address.");
+    }
+
+    bool cond_met = false;
+    switch (GET_OP0(insn)) {
+      case 0x0b:
+        cond_met = (rt_val != ra_val);
+        break;
+
+      case 0x0c:
+        cond_met = (rt_val > ra_val);
+        break;
+    }
+    const uint32_t new_pc = cond_met ?
+      (uint32_t)(ext_prec_val & 0x00000000FFFFFFFFU) : (pc + sizeof(uint32_t));
+    if (!CuSetProgCtr(new_pc, err)) {
+        return false;
+    }
+    return true;
+}
+
 void CuInitOps(void) {
     cup_op_executors[0x00] = CuExecOp0x00;
 
-    cup_op_executors[0x01] = CuExecOp0x01;
-    cup_op_executors[0x02] = CuExecOp0x02;
-    cup_op_executors[0x03] = CuExecOp0x03;
+    cup_op_executors[0x01] = CuExecOp0x01To03;
+    cup_op_executors[0x02] = CuExecOp0x01To03;
+    cup_op_executors[0x03] = CuExecOp0x01To03;
     cup_op_executors[0x04] = CuExecOp0x04;
+    cup_op_executors[0x05] = CuExecOp0x05To06;
+    cup_op_executors[0x06] = CuExecOp0x05To06;
+    cup_op_executors[0x07] = CuExecOp0x07To0a;
+    cup_op_executors[0x08] = CuExecOp0x07To0a;
+    cup_op_executors[0x09] = CuExecOp0x07To0a;
+    cup_op_executors[0x0a] = CuExecOp0x07To0a;
+    cup_op_executors[0x0b] = CuExecOp0x0bTo0c;
+    cup_op_executors[0x0c] = CuExecOp0x0bTo0c;
 
     // TODO: Define and implement the rest of the ISA.
-    cup_op_executors[0x05] = CuExecBadOp0xNN;
-    cup_op_executors[0x06] = CuExecBadOp0xNN;
-    cup_op_executors[0x07] = CuExecBadOp0xNN;
-    cup_op_executors[0x08] = CuExecBadOp0xNN;
-    cup_op_executors[0x09] = CuExecBadOp0xNN;
-    cup_op_executors[0x0a] = CuExecBadOp0xNN;
-    cup_op_executors[0x0b] = CuExecBadOp0xNN;
-    cup_op_executors[0x0c] = CuExecBadOp0xNN;
     cup_op_executors[0x0d] = CuExecBadOp0xNN;
     cup_op_executors[0x0e] = CuExecBadOp0xNN;
     cup_op_executors[0x0f] = CuExecBadOp0xNN;

@@ -32,7 +32,8 @@ base-address and the number of bytes are unsigned 32-bit numbers, each encoded
 using four little-endian bytes.
 
 You can use your favorite hex-editor to create such a memory-image file. For
-example, using the `xxd` tool that is available with Vim:
+example, using the [xxd](https://github.com/ConorOG/xxd/) tool (which is
+also available with [Vim](https://www.vim.org/)):
 
 ```shell
 $ cat test.txt
