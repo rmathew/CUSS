@@ -10,11 +10,18 @@
 
 extern bool CuIsValidPhyMemAddr(uint32_t addr, CuError* restrict err);
 
-extern bool CuByteAt(uint32_t addr, uint8_t* restrict val,
+extern bool CuGetByteAt(uint32_t addr, uint8_t* restrict val,
   CuError* restrict err);
 
-extern bool CuWordAt(uint32_t addr, uint32_t* restrict val,
+extern bool CuGetHalfWordAt(uint32_t addr, uint16_t* restrict val,
   CuError* restrict err);
+
+extern bool CuGetWordAt(uint32_t addr, uint32_t* restrict val,
+  CuError* restrict err);
+
+extern bool CuSetByteAt(uint32_t addr, uint8_t val, CuError* restrict err);
+extern bool CuSetHalfWordAt(uint32_t addr, uint16_t val, CuError* restrict err);
+extern bool CuSetWordAt(uint32_t addr, uint32_t val, CuError* restrict err);
 
 extern bool CuInitMemFromFile(const char* restrict file, CuError* restrict err);
 

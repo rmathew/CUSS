@@ -6,4 +6,4 @@ src/errors.o: src/errors.c src/errors.h
 src/memory.h:
 src/memory.o: src/memory.c src/memory.h src/errors.h
 src/ops.h:
-src/ops.o: src/ops.c src/ops.h src/errors.h src/cpu.h
+src/ops.o: src/ops.c src/ops.h src/errors.h src/cpu.h src/memory.h

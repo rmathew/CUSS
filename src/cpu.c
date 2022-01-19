@@ -10,7 +10,7 @@
 
 // Number of integer registers and their default values (except for `r0`).
 #define NUM_IREGS (1 << 5)
-#define DEF_REG_VAL 0xdeadbeefU
+#define DEF_REG_VAL 0xbadebabaU
 
 // What to reset the program-counter to, upon receiving a hard reset signal.
 #define RESET_VECTOR 0x00000000U
@@ -29,7 +29,7 @@ static uint32_t cup_psr;
 
 static inline bool NextInsn(uint32_t* restrict insn, CuError* restrict err) {
     CuError nerr;
-    if (!CuWordAt(cup_pc, insn, &nerr)) {
+    if (!CuGetWordAt(cup_pc, insn, &nerr)) {
         return CuErrMsg(err, "Error reading instruction: %s", nerr.err_msg);
     }
     return true;

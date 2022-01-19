@@ -12,6 +12,10 @@
 
 static uint8_t cuss_mem[CUSS_MEMSIZE];
 
+static inline uint16_t LeTwinBytesToUint16(const uint8_t* bytes) {
+    return (uint16_t)(bytes[0]) | ((uint16_t)(bytes[1]) << 8);
+}
+
 static inline uint32_t LeQuadBytesToUint32(const uint8_t* bytes) {
     return (uint32_t)(bytes[0]) | ((uint32_t)(bytes[1]) << 8) |
       ((uint32_t)(bytes[2]) << 16) | ((uint32_t)(bytes[3]) << 24);
@@ -24,7 +28,7 @@ bool CuIsValidPhyMemAddr(uint32_t addr, CuError* restrict err) {
     return true;
 }
 
-bool CuByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
+bool CuGetByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
     if (!CuIsValidPhyMemAddr(addr, err)) {
         return false;
     }
@@ -36,8 +40,23 @@ bool CuByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
     return true;
 }
 
-bool CuWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err)) {
+bool CuGetHalfWordAt(uint32_t addr, uint16_t* restrict val,
+  CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err) ||
+      !CuIsValidPhyMemAddr(addr + 1U, err)) {
+        return false;
+    }
+    if (val == NULL) {
+        return CuErrMsg(err, "NULL fetch-location.");
+    }
+    // TODO: Maybe check for unaligned memory-access.
+    *val = LeTwinBytesToUint16(cuss_mem + addr);
+    return true;
+}
+
+bool CuGetWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err) ||
+      !CuIsValidPhyMemAddr(addr + 3U, err)) {
         return false;
     }
     if (val == NULL) {
@@ -45,6 +64,38 @@ bool CuWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
     }
     // TODO: Maybe check for unaligned memory-access.
     *val = LeQuadBytesToUint32(cuss_mem + addr);
+    return true;
+}
+
+bool CuSetByteAt(uint32_t addr, uint8_t val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err)) {
+        return false;
+    }
+    cuss_mem[addr] = val;
+    return true;
+}
+
+bool CuSetHalfWordAt(uint32_t addr, uint16_t val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err) ||
+      !CuIsValidPhyMemAddr(addr + 1U, err)) {
+        return false;
+    }
+    uint8_t* base = cuss_mem + addr;
+    *base = (uint8_t)(val & 0x00FFU);
+    *(base + 1) = (uint8_t)((val & 0xFF00U) >> 8);
+    return true;
+}
+
+bool CuSetWordAt(uint32_t addr, uint32_t val, CuError* restrict err) {
+    if (!CuIsValidPhyMemAddr(addr, err) ||
+      !CuIsValidPhyMemAddr(addr + 3U, err)) {
+        return false;
+    }
+    uint8_t* base = cuss_mem + addr;
+    *base = (uint8_t)(val & 0x000000FFU);
+    *(base + 1) = (uint8_t)((val & 0x0000FF00U) >> 8);
+    *(base + 2) = (uint8_t)((val & 0x00FF0000U) >> 16);
+    *(base + 3) = (uint8_t)((val & 0xFF000000U) >> 24);
     return true;
 }
 
