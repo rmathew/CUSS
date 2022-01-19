@@ -372,7 +372,7 @@ static bool CuExecBoolImmOps(uint32_t pc, uint32_t insn,
     return true;
 }
 
-// ADDI: Addition of `ra` with a sign-extended 16-bit immediate value.
+// ADDI (0x04): Addition of `ra` with a sign-extended 16-bit immediate value.
 static bool CuExecAddImmOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
     uint32_t ra_val;
     if (!CuGetIntReg(GET_RA(insn), &ra_val, err)) {
@@ -400,7 +400,7 @@ static bool CuExecAddImmOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
 // JALI (0x06): Like JMPI above, but saves the return-address in `r31`.
 static bool CuExecJmpOps(uint32_t pc, uint32_t insn, CuError* restrict err) {
     uint64_t ext_prec_val = GET_IMM26(insn);
-    if (ext_prec_val & 0x0000000004000000U) {
+    if (ext_prec_val & 0x0000000002000000U) {
         ext_prec_val |= 0xFFFFFFFFFC000000U;
     }
     ext_prec_val <<= 2;
@@ -507,7 +507,7 @@ static bool CuExecCmpBranchOps(uint32_t pc, uint32_t insn,
     return true;
 }
 
-// LDUI: Load the upper 16 bits of `rt` using `imm16` (`ra` is ignored).
+// LDUI (0x0d): Load the upper 16 bits of `rt` using `imm16` (`ra` is ignored).
 static bool CuExecLoadUpImmOp(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     if (!CuSetIntReg(GET_RT(insn), GET_IMM16(insn) << 16, err)) {

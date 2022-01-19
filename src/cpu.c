@@ -10,7 +10,7 @@
 
 // Number of integer registers and their default values (except for `r0`).
 #define NUM_IREGS (1 << 5)
-#define DEF_REG_VAL 0xbadebabaU
+#define DEF_REG_VAL 0xc0def00dU
 
 // What to reset the program-counter to, upon receiving a hard reset signal.
 #define RESET_VECTOR 0x00000000U
