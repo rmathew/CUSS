@@ -22,8 +22,8 @@
 #define GET_RA(insn) (uint8_t)(((insn & 0x001F0000U) >> 16) & 0x0000001FU)
 #define GET_RB(insn) (uint8_t)(((insn & 0x0000F800U) >> 11) & 0x0000001FU)
 
-// Extract the `shamt` field from an instruction.
-#define GET_SHAMT(insn) (uint8_t)(((insn & 0x000007C0U) >> 6) & 0x0000001FU)
+// Extract the `imm5` field from an instruction.
+#define GET_IMM5(insn) (uint8_t)(((insn & 0x000007C0U) >> 6) & 0x0000001FU)
 
 // Extract the `imm16` field from an instruction.
 #define GET_IMM16(insn) (insn & 0x0000FFFFU)
@@ -131,9 +131,9 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
 
       case 0x06:
       case 0x07: {
-        // SLLI (0x06): Shift `ra` left logically using the `shamt` immediate.
+        // SLLI (0x06): Shift `ra` left logically using the `imm5` immediate.
         // SLIF (0x07): The same as SLLI, but sets the integer condition-flags.
-        ext_prec_val = (uint64_t)ra_val << GET_SHAMT(insn);
+        ext_prec_val = (uint64_t)ra_val << GET_IMM5(insn);
         if (!CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err)) {
             return false;
         }
@@ -147,18 +147,18 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
       case 0x09:
       case 0x0a:
       case 0x0b: {
-        // SRLI (0x08): Shift `ra` right logically using the `shamt` immediate.
+        // SRLI (0x08): Shift `ra` right logically using the `imm5` immediate.
         // SRIF (0x09): The same as SRLI, but sets the integer condition-flags.
-        // SRAI (0x0a): Shift `ra` right arithmetic with the `shamt` immediate.
+        // SRAI (0x0a): Shift `ra` right arithmetic with the `imm5` immediate.
         // SRAJ (0x0b): The same as SRAI, but sets the integer condition-flags.
-        const uint8_t shamt = GET_SHAMT(insn);
-        ext_prec_val = (uint64_t)ra_val >> shamt;
+        const uint8_t imm5 = GET_IMM5(insn);
+        ext_prec_val = (uint64_t)ra_val >> imm5;
         // NOTE: Right shifts for unsigned types in C99 are logical shifts.
         // We therefore need to manually propagate the sign-bit.
         if ((op1 == 0x0a || op1 == 0x0b) && (ra_val & 0x80000000U)) {
-            // A string of `shamt` 1s in the LSB.
-            uint64_t mask = (1 << shamt) - 1;
-            mask <<= (32 - shamt);
+            // A string of `imm5` 1s in the LSB.
+            uint64_t mask = (1 << imm5) - 1;
+            mask <<= (32 - imm5);
             ext_prec_val |= mask;
         }
         if (!CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err)) {
@@ -303,13 +303,13 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
 
       case 0x1e:
       case 0x1f: {
-        // JMPR (0x1e): Jump to the address `ra` + (`rb` << `shamt`).
+        // JMPR (0x1e): Jump to the address `ra` + (`rb` << `imm5`).
         // JALR (0x1f): Like JMPR above, but saves the return-address in `r31`.
         ext_prec_val = rb_val;
         if (ext_prec_val & 0x0000000080000000U) {
             ext_prec_val |= 0xFFFFFFFF00000000U;
         }
-        ext_prec_val <<= GET_SHAMT(insn);
+        ext_prec_val <<= GET_IMM5(insn);
         ext_prec_val += ra_val;
         if (ext_prec_val & 0x8000000000000000U) {
             return CuErrMsg(err, "Negative jump-address.");
