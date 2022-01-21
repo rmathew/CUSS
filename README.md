@@ -2,8 +2,9 @@
 
 ## Introduction
 
-CUSS is a work-in-progress simulator for the Completely Useless System (CUS),
-which is based on the Completely Useless Processor (CUP).
+CUSS is a work-in-progress simulator for the [Completely Useless
+System](doc/cus.md) (CUS), which is based on the [Completely Useless
+Processor](doc/cup.md) (CUP).
 
 See the [INSTALL.md](INSTALL.md) file for instructions on building and
 installing CUSS. CUSS is licensed under the terms of the three-clause BSD
