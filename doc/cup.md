@@ -42,9 +42,9 @@ CUP has a 32-bit program-counter register `pc` that points to the next
 instruction to be executed by the CPU. There are no instructions to directly
 access `pc`.
 
-CUP also has a 32-bit `flags` register to represent various bits of information
-about the program-state. As of now, only four flags are defined - `N`
-(negative), `O` (overflow), `C` (carry), and `Z` (zero) - to represent various
+CUP also has a 32-bit `psr` register to represent various bits of information
+about the program-state. As of now, only four flags are defined -- `N`
+(negative), `O` (overflow), `C` (carry), and `Z` (zero) -- to represent various
 conditions for integer arithmetic.
 
 Note that the integer condition-code flags are usually only set by some
@@ -76,16 +76,17 @@ to represent the primary source operand register of an operation.
 
 The instruction-formats are:
 
-1.  R-type, for instructions with a target register operand and two source
-register operands (or that need a small immediate operand, like some logical
-shift instructions).
-1.  I-type, for instructions with a target register operand, a source register
-operand, and a sign-extended 16-bit immediate operand (zero-extended in case of
-logical instructions).
-1.  B-type, for instructions that use a single register operand and a 21-bit
-sign-extended immediate operand (like conditional branch instructions).
+1.  R-type, for instructions with a target register operand `rt` and two source
+register operands `ra` and `rb` (or that need a small immediate operand `imm5`,
+like some logical shift instructions).
+1.  I-type, for instructions with a target register operand `rt`, a source
+register operand `ra`, and a sign-extended 16-bit immediate operand `imm16`
+(zero-extended in case of logical instructions).
+1.  B-type, for instructions that use a single register operand `rt` and a
+21-bit sign-extended immediate operand `imm21` (like conditional branch
+instructions).
 1.  J-type, for instructions that need to use all the available space for a
-sign-extended 26-bit immediate operand (like unconditional jumps).
+sign-extended 26-bit immediate operand `imm26` (like unconditional jumps).
 
 The uniform encoding of instructions make it relatively easy to decode them for
 execution.
@@ -96,9 +97,58 @@ The mnemonics for the instructions in this document are always 4 uppercase
 letters (32-bit mnemonics for 32-bit instructions). The target of an instruction
 comes before its source operands.
 
+The descriptions of the instructions in the following subsections use a C-like
+pseudo-code for brevity and unambiguity with the following additional semantics:
+
+*   `R[n]` is the value of the integer-register numbered `n`.
+*   `M[n]` is the word at the memory-location `n`.
+*   `x:y` is the bit-field comprising bits numbered `x` (MSB) and `y` inclusive.
+*   `SgnExt()` refers to sign-extension, while `ZerExt()` is zero-extension.
+*   "Mnem" is short for "instruction-mnemonic".
+*   "Fmt" is short for "instruction-format", denoting one of the R-, I-, B-, or
+J-type of encoding.
+*   "OpC" is short for "operation-code" (aka opcode). All numbers are hexadecimal. Just `nn` means only the `op0` field is set to this value, while `nn/mm` means
+that `op0` is set to `nn`, while `op1` is set to `mm`.
+*   "Like ABCD, but sets flags" is short for "The same behavior as the ABCD
+instruction, but also sets the relevant condition-code flags in the `psr`
+register".
+
 ### Logical Instructions
 
-TODO: Flesh this out.
+CUP provides instructions for performing logical operations like AND, OR, etc.
+and for shifting bits in a register. The following table summarizes these
+logical instructions:
+
+| Mnem | Instruction | Operation | Fmt | OpC |
+| :---- | :---------- | :-------- | :-: | :-- |
+| SLLR | Shift left logical by register-value. | `R[rt] = R[ra] << R[rb]` | R | 00/00 |
+| SLRF | Like SLLR, but sets flags. | `R[rt] = R[ra] << R[rb]` | R | 00/01 |
+| SRLR | Shift right logical by register-value. | `R[rt] = R[ra] >> R[rb]` (unsigned) | R | 00/02 |
+| SRRF | Like SRLR, but sets flags. | `R[rt] = R[ra] >> R[rb]` (unsigned) | R | 00/03 |
+| SRAR | Shift right arithmetic by register-value. | `R[rt] = R[ra] >> R[rb]` (signed) | R | 00/04 |
+| SRAS | Like SRAR, but sets flags. | `R[rt] = R[ra] >> R[rb]` (signed) | R | 00/05 |
+| SLLI | Shift left logical by immediate-value. | `R[rt] = R[ra] << imm5` | R | 00/06 |
+| SLIF | Like SLLI, but sets flags. | `R[rt] = R[ra] << imm5` | R | 00/07 |
+| SRLI | Shift right logical by immediate-value. | `R[rt] = R[ra] >> imm5` (unsigned) | R | 00/08 |
+| SRIF | Like SRLI, but sets flags. | `R[rt] = R[ra] >> imm5` (unsigned) | R | 00/09 |
+| SRAI | Shift right arithmetic by immediate-value. | `R[rt] = R[ra] >> imm5` (signed) | R | 00/0a |
+| SRAJ | Like SRAI, but sets flags. | `R[rt] = R[ra] >> imm5` (signed) | R | 00/0b |
+| ANDR | Bit-wise AND of registers. | `R[rt] = R[ra] & R[rb]` | R | 00/0c |
+| ADRF | Like ANDR, but sets flags. | `R[rt] = R[ra] & R[rb]` | R | 00/0d |
+| ORRR | Bit-wise OR of registers. | `R[rt] = R[ra] \| R[rb]` | R | 00/0e |
+| ORRF | Like ORRR, but sets flags. | `R[rt] = R[ra] \| R[rb]` | R | 00/0f |
+| NOTR | Bit-wise NOT of a register. | `R[rt] = ~R[ra]` | R | 00/10 |
+| NOTF | Like NOTR, but sets flags. | `R[rt] = ~R[ra]` | R | 00/11 |
+| XORR | Bit-wise XOR of registers. | `R[rt] = R[ra] ^ R[rb]` | R | 00/12 |
+| XORF | Like XORR, but sets flags. | `R[rt] = R[ra] ^ R[rb]` | R | 00/13 |
+| ANDI | Bit-wise AND with imm-value; sets flags. | `R[rt] = R[ra] & ZerExt(imm16)` | I | 01 |
+| ORRI | Bit-wise OR with imm-value; sets flags. | `R[rt] = R[ra] \| ZerExt(imm16)` | I | 02 |
+| XORI | Bit-wise XOR with imm-value; sets flags. | `R[rt] = R[ra] ^ ZerExt(imm16)` | I | 03 |
+
+Note from the above that a word with all zeroes is the same as the instruction
+"SLLR r0, r0, r0", which has no effect (recall that `r0` is all zeroes and is
+also read-only). The usual "NOP" (no-operation) instruction is thus just a
+pseudo-instruction that maps to "SLLR r0, r0, r0".
 
 ### Arithmetic Instructions
 
