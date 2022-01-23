@@ -18,6 +18,7 @@ SRCS = \
        src/cuss.c \
        src/errors.c \
        src/memory.c \
+       src/opdec.c \
        src/ops.c \
 
 OBJS = $(SRCS:.c=.o)

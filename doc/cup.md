@@ -184,6 +184,10 @@ The following table summarizes the arithmetic instructions:
 | DIVF | Like DIVR, but sets flags. | `R[rt] = ep:R[ra] / R[rb]; ep = ep:R[ra] % R[rb]` | R | 00/1b |
 | RDEP | Read the value in `ep`. | `R[rt] = ep` | R | 00/1c |
 | WREP | Write a value to `ep`. | `ep = R[ra]` | R | 00/1d |
+| ADDI | Add an immediate value. | `R[rt] = R[ra] + SgnExt(imm16)` | I | 04 |
+
+Note that there is no SUBI instruction since that can be simulated with a
+sign-inverted immediate value to ADDI.
 
 ### Control-Flow Instructions
 

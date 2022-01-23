@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "memory.h"
+#include "opdec.h"
 #include "ops.h"
 
 // Number of integer registers and their default values (except for `r0`).
@@ -135,8 +136,12 @@ bool CuPrintCpuState(CuError* restrict err) {
     if (!NextInsn(&insn, err)) {
         return false;
     }
-    printf("CPU-State (PC=%08" PRIx32 ", Insn@PC=%08" PRIx32 "):", cup_pc,
-      insn);
+
+#define INSN_DEC_BUF_SIZ 64
+    char insn_dec[INSN_DEC_BUF_SIZ];
+    CuDecodeOp(insn, insn_dec, INSN_DEC_BUF_SIZ);
+
+    printf("CPU-State (Insn@%08" PRIx32 " '%s'):", cup_pc, insn_dec);
     for (int i = 0; i < NUM_IREGS; i++) {
 #define REGS_PER_LINE 8
         if (i % REGS_PER_LINE == 0) {

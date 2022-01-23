@@ -39,7 +39,7 @@ LDFLAGS =
 LDLIBS =
 
 # Gather the automatically-generated dependency-information into a single file.
-MK_DEPEND_MK = sort -u $(DEPS) | sed 's/^[ \t]*$$//' | sed '/^$$/d' > depend.mk
+MK_DEPEND_MK = cat $(DEPS) | sed 's/^[ \t]*$$//' | sed '/^$$/d' > depend.mk
 
 # How to create an object-file from source-code.
 .c.o:
