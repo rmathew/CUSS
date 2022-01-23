@@ -467,7 +467,7 @@ static bool CuExecFlagBranchOps(uint32_t pc, uint32_t insn,
 }
 
 // BRNE (0x0b): Jump to the PC-relative address at sign-extended `imm16` (taken
-// as a word-address) when `rt` == `ra`.
+// as a word-address) when `rt` != `ra`.
 // BRGT (0x0c): Like BRNE, but when `rt` > `ra`.
 static bool CuExecCmpBranchOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {

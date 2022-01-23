@@ -23,6 +23,12 @@ from unaligned memory-locations, albeit with a slight performance-penalty. It
 also allows directly reading and writing half-words (16 bits) and bytes (8 bits)
 for convenience.
 
+Note that an instruction in CUP might take more than one cycle to execute even
+when all the data is readily available in registers (e.g. the multiplication and
+division instructions). Note also that CUP does not use delay slots and an
+instruction might stall waiting for data to be written from a previous
+instruction. These characterisitcs are different from some stricter RISC CPUs.
+
 ## Registers
 
 CUP provides access to 32 general-purpose 32-bit integer registers. These are
@@ -104,6 +110,7 @@ pseudo-code for brevity and unambiguity with the following additional semantics:
 *   `M[n]` is the word at the memory-location `n`.
 *   `x:y` is the bit-field comprising bits numbered `x` (MSB) and `y` inclusive.
 *   `SgnExt()` refers to sign-extension, while `ZerExt()` is zero-extension.
+*   `IsSet()` is true when the given flag is set, false otherwise.
 *   "Mnem" is short for "instruction-mnemonic".
 *   "Fmt" is short for "instruction-format", denoting one of the R-, I-, B-, or
 J-type of encoding.
@@ -152,15 +159,73 @@ pseudo-instruction that maps to "SLLR r0, r0, r0".
 
 ### Arithmetic Instructions
 
-TODO: Flesh this out.
+CUP supports the usual set of integer arithmetic operations. Since the
+multiplication of two 32-bit numbers can yield upto 64 bits, the register `ep`
+holds the upper 32 bits of a multiplication-result. It can also be used to hold
+the upper 32 bits of a 64-bit dividend before division and the remainder after
+division. `ep` can be populated using the WREP instruction and can be read via
+the RDEP instruction.
+
+The following table summarizes the arithmetic instructions:
+
+| Mnem | Instruction | Operation | Fmt | OpC |
+| :---- | :---------- | :-------- | :-: | :-- |
+| ADDR | Add two registers. | `R[rt] = R[ra] + R[rb]` | R | 00/14 |
+| ADDF | Like ADDR, but sets flags. | `R[rt] = R[ra] + R[rb]` | R | 00/15 |
+| SUBR | Subtract two registers. | `R[rt] = R[ra] - R[rb]` | R | 00/16 |
+| SUBF | Like SUBR, but sets flags. | `R[rt] = R[ra] - R[rb]` | R | 00/17 |
+| MULR | Multiply two registers. | `ep:R[rt] = R[ra] * R[rb]` | R | 00/18 |
+| MULF | Like MULR, but sets flags. | `ep:R[rt] = R[ra] * R[rb]` | R | 00/19 |
+| DIVR | Divide two registers. | `R[rt] = ep:R[ra] / R[rb]; ep = ep:R[ra] % R[rb]` | R | 00/1a |
+| DIVF | Like DIVR, but sets flags. | `R[rt] = ep:R[ra] / R[rb]; ep = ep:R[ra] % R[rb]` | R | 00/1b |
+| RDEP | Read the value in `ep`. | `R[rt] = ep` | R | 00/1c |
+| WREP | Write a value to `ep`. | `ep = R[ra]` | R | 00/1d |
 
 ### Control-Flow Instructions
 
-TODO: Flesh this out.
+CUP provides a few control-flow instructions for conditional and unconditional
+jumps in a program. For procedure-calls, the `r31` register additionally holds
+the return-address. Note that address-calculations are usually relative to the
+`pc` register, use sign-extended immediate values, and have wraparound
+semantics over the entire 4GB address-space.
+
+The following table summarizes the control-flow instructions:
+
+| Mnem | Instruction | Operation | Fmt | OpC |
+| :---- | :---------- | :-------- | :-: | :-- |
+| JMPR | Jump to an address based on register-values. | `pc = R[ra] + (R[rb] << imm5)` | R | 00/1e |
+| JALR | Like JMPR, but also sets up the link-register. | `R[31] = pc + 4; pc = R[ra] + (R[rb] << imm5)` | R | 00/1f |
+| JMPI | Jump to the word-address in `imm26`. | `pc += SgnExt(imm26) << 2` | I | 05 |
+| JALI | Like JMPI, but also sets up the link-register. | `R[31] = pc + 4; pc += SgnExt(imm26) << 2` | I | 06 |
+| BRNR | Branch if `N` is set. | `pc = IsSet(N) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 07 |
+| BROR | Branch if `O` is set. | `pc = IsSet(O) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 08 |
+| BRCR | Branch if `C` is set. | `pc = IsSet(C) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 09 |
+| BRZR | Branch if `Z` is set. | `pc = IsSet(Z) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 0a |
+| BRNE | Branch if registers are not equal. | `pc += R[rt] != R[ra] ? SgnExt(imm16) : 4` | B | 0b |
+| BRGT | Branch if one register is greater than another. | `pc += R[rt] > R[ra] ? SgnExt(imm16) : 4` | B | 0c |
 
 ### Load-Store Instructions
 
-TODO: Flesh this out.
+Load-store instructions are the only way to transfer data from or to memory.
+Note that you can load a 32-bit constant into a register by using a combination
+of ORRI with `r0` and LDUI. For example, "ORRI r3, r0, 0x5678" followed by
+"LDUI r3, 0x1234" loads the 32-bit constant 0x12345678 into `r3`. The OR with
+`r0` trick can also be used to copy values across registers. For example, the
+instruction "ORRR r4, r3, r0" copies over the value in `r3` into `r4`.
+
+The following table summarizes the load-store instructions:
+
+| Mnem | Instruction | Operation | Fmt | OpC |
+| :---- | :---------- | :-------- | :-: | :-- |
+| LDUI | Load the upper 16 bits of a register. | `R[rt](31:16) = imm16` | I | 0d |
+| LDWD | Load a word into a register. | `R[rt] = M[R[ra] + SgnExt(imm16)]` | I | 0e |
+| LDHS | Load a sign-extended half-word into a register. | `R[rt] = SgnExt(M[R[ra] + SgnExt(imm16)](15:0))` | I | 0f |
+| LDHU | Load a zero-extended half-word into a register. | `R[rt] = ZerExt(M[R[ra] + SgnExt(imm16)](15:0))` | I | 10 |
+| LDBS | Load a sign-extended byte into a register. | `R[rt] = SgnExt(M[R[ra] + SgnExt(imm16)](7:0))` | I | 11 |
+| LDBU | Load a zero-extended byte into a register. | `R[rt] = ZerExt(M[R[ra] + SgnExt(imm16)](7:0))` | I | 12 |
+| STWD | Store a word into memory. | `M[R[ra] + SgnExt(imm16)] = R[rt]` | I | 13 |
+| STHW | Store a half-word into memory. | `M[R[ra] + SgnExt(imm16)](15:0) = R[rt](15:0)` | I | 14 |
+| STSB | Store a byte into memory. | `M[R[ra] + SgnExt(imm16)](7:0) = R[rt](7:0)` | I | 15 |
 
 ## TODOs
 
