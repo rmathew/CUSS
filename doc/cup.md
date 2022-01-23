@@ -29,6 +29,10 @@ division instructions). Note also that CUP does not use delay slots and an
 instruction might stall waiting for data to be written from a previous
 instruction. These characterisitcs are different from some stricter RISC CPUs.
 
+Input/output is memory-mapped. The memory-controller in CUS maps I/O devices to
+certain physical memory-addresses such that reads/writes from/to these addresses
+automatically result in communication with the corresponding I/O peripheral.
+
 ## Registers
 
 CUP provides access to 32 general-purpose 32-bit integer registers. These are
@@ -195,12 +199,12 @@ The following table summarizes the control-flow instructions:
 | :---- | :---------- | :-------- | :-: | :-- |
 | JMPR | Jump to an address based on register-values. | `pc = R[ra] + (R[rb] << imm5)` | R | 00/1e |
 | JALR | Like JMPR, but also sets up the link-register. | `R[31] = pc + 4; pc = R[ra] + (R[rb] << imm5)` | R | 00/1f |
-| JMPI | Jump to the word-address in `imm26`. | `pc += SgnExt(imm26) << 2` | I | 05 |
-| JALI | Like JMPI, but also sets up the link-register. | `R[31] = pc + 4; pc += SgnExt(imm26) << 2` | I | 06 |
-| BRNR | Branch if `N` is set. | `pc = IsSet(N) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 07 |
-| BROR | Branch if `O` is set. | `pc = IsSet(O) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 08 |
-| BRCR | Branch if `C` is set. | `pc = IsSet(C) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 09 |
-| BRZR | Branch if `Z` is set. | `pc = IsSet(Z) ? R[rt] + SgnExt(imm21) : pc + 4` | I | 0a |
+| JMPI | Jump to the word-address in `imm26`. | `pc += SgnExt(imm26) << 2` | J | 05 |
+| JALI | Like JMPI, but also sets up the link-register. | `R[31] = pc + 4; pc += SgnExt(imm26) << 2` | J | 06 |
+| BRNR | Branch if `N` is set. | `pc = IsSet(N) ? R[rt] + SgnExt(imm21) : pc + 4` | B | 07 |
+| BROR | Branch if `O` is set. | `pc = IsSet(O) ? R[rt] + SgnExt(imm21) : pc + 4` | B | 08 |
+| BRCR | Branch if `C` is set. | `pc = IsSet(C) ? R[rt] + SgnExt(imm21) : pc + 4` | B | 09 |
+| BRZR | Branch if `Z` is set. | `pc = IsSet(Z) ? R[rt] + SgnExt(imm21) : pc + 4` | B | 0a |
 | BRNE | Branch if registers are not equal. | `pc += R[rt] != R[ra] ? SgnExt(imm16) : 4` | B | 0b |
 | BRGT | Branch if one register is greater than another. | `pc += R[rt] > R[ra] ? SgnExt(imm16) : 4` | B | 0c |
 
