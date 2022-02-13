@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "logger.h"
+
 #define CUSS_MEMSIZE (1 << 20)
 
 static uint8_t cuss_mem[CUSS_MEMSIZE];
@@ -142,7 +144,7 @@ bool CuInitMemFromFile(const char* restrict file, CuError* restrict err) {
             return CuErrMsg(err, "Truncated section-data (%u < %u).", ndata,
               nbytes);
         }
-        printf("INFO: Loaded nbytes=0x%08" PRIx32 " at base=0x%08" PRIx32 "\n",
+        CuLogInfo("Loaded nbytes=0x%08" PRIx32 " at base=0x%08" PRIx32 "\n",
           nbytes, base);
     } while (!feof(f) && !ferror(f));
     if (ferror(f)) {

@@ -2,9 +2,13 @@
 PREFIX = /usr/local
 
 # How to find the SDL2 headers.
+#
 # TIP: Use `sdl2-config --cflags` or `pkg-config sdl2 --cflags` to get the
 # correct values for your system.
-SDL2_INCS = -I/usr/include/SDL2 -D_REENTRANT
+#
+# NOTE: Using `-isystem` instead of the usual `-I` flag to consider the SDL2
+# header-files as system-files and omit them from listed dependencies.
+SDL2_INCS = -isystem /usr/include/SDL2 -D_REENTRANT
 
 # How to link against the SDL2 libraries.
 # TIP: Use `sdl2-config --libs` or `pkg-config sdl2 --libs` to get the
@@ -30,13 +34,13 @@ MAK_FLAGS = -MT $(<:.c=.o) -MMD -MP
 DEV_FLAGS = $(MAK_FLAGS) -g1 -Werror -pedantic-errors
 
 # Which flags to pass to the C compiler.
-CFLAGS = $(INCS) $(WRN_FLAGS) $(OPT_FLAGS)
+CFLAGS = $(SDL2_INCS) $(WRN_FLAGS) $(OPT_FLAGS)
 
 # Which flags to pass to the linker-wrapper.
 LDFLAGS =
 
 # Which extra libraries to include during the linking step.
-LDLIBS =
+LDLIBS = $(SDL2_LIBS)
 
 # Gather the automatically-generated dependency-information into a single file.
 MK_DEPEND_MK = cat $(DEPS) | sed 's/^[ \t]*$$//' | sed '/^$$/d' > depend.mk

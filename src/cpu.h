@@ -8,6 +8,9 @@
 
 #include "errors.h"
 
+// Number of integer registers.
+#define CU_NUM_IREGS (1 << 5)
+
 extern void CuInitCpu(void);
 
 extern bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val,
@@ -27,7 +30,5 @@ extern bool CuIsZerFlagSet(void);
 extern void CuSetIntFlags(bool neg, bool ovf, bool car, bool zer);
 
 extern bool CuExecNextInsn(CuError* restrict err);
-
-extern bool CuPrintCpuState(CuError* restrict err);
 
 #endif  // CUSS_CPU_INCLUDED

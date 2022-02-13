@@ -17,6 +17,7 @@ SRCS = \
        src/cpu.c \
        src/cuss.c \
        src/errors.c \
+       src/logger.c \
        src/memory.c \
        src/opdec.c \
        src/ops.c \

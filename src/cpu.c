@@ -3,21 +3,18 @@
 #include "cpu.h"
 
 #include <inttypes.h>
-#include <stdio.h>
 
 #include "memory.h"
-#include "opdec.h"
 #include "ops.h"
 
-// Number of integer registers and their default values (except for `r0`).
-#define NUM_IREGS (1 << 5)
+// The default values in the integer registers (except for `r0`).
 #define DEF_REG_VAL 0xc0def00dU
 
 // What to reset the program-counter to, upon receiving a hard reset signal.
 #define RESET_VECTOR 0x00000000U
 
 // The general-purpose integer registers in a CUP core.
-static uint32_t cup_iregs[NUM_IREGS];
+static uint32_t cup_iregs[CU_NUM_IREGS];
 
 // An additional register to provide extended precision during multiply/divide.
 static uint32_t cup_epr;
@@ -39,7 +36,7 @@ static inline bool NextInsn(uint32_t* restrict insn, CuError* restrict err) {
 void CuInitCpu(void) {
     cup_pc = RESET_VECTOR;
     cup_iregs[0] = 0x00000000U;
-    for (int i = 1; i < NUM_IREGS; i++) {
+    for (int i = 1; i < CU_NUM_IREGS; i++) {
         cup_iregs[i] = DEF_REG_VAL;
     }
     cup_psr = 0x00000000U;
@@ -48,7 +45,7 @@ void CuInitCpu(void) {
 }
 
 bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val, CuError* restrict err) {
-    if (r_n >= NUM_IREGS) {
+    if (r_n >= CU_NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
     }
     *r_val = cup_iregs[r_n];
@@ -56,7 +53,7 @@ bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val, CuError* restrict err) {
 }
 
 bool CuSetIntReg(uint8_t r_n, uint32_t r_val, CuError* restrict err) {
-    if (r_n >= NUM_IREGS) {
+    if (r_n >= CU_NUM_IREGS) {
         return CuErrMsg(err, "Bad register (r_n=%02" PRIx8 ").");
     }
     if (r_n != 0x00) {
@@ -128,28 +125,5 @@ bool CuExecNextInsn(CuError* restrict err) {
     if (!CuExecOp(cup_pc, insn, err)) {
         return false;
     }
-    return true;
-}
-
-bool CuPrintCpuState(CuError* restrict err) {
-    uint32_t insn;
-    if (!NextInsn(&insn, err)) {
-        return false;
-    }
-
-#define INSN_DEC_BUF_SIZ 64
-    char insn_dec[INSN_DEC_BUF_SIZ];
-    CuDecodeOp(insn, insn_dec, INSN_DEC_BUF_SIZ);
-
-    printf("CPU-State (Insn@%08" PRIx32 " '%s'):", cup_pc, insn_dec);
-    for (int i = 0; i < NUM_IREGS; i++) {
-#define REGS_PER_LINE 8
-        if (i % REGS_PER_LINE == 0) {
-            printf("\n[r%02d-r%02d]:", i, i + REGS_PER_LINE - 1);
-        }
-        printf(" %08" PRIx32 "", cup_iregs[i]);
-#undef REGS_PER_LINE
-    }
-    putchar('\n');
     return true;
 }
