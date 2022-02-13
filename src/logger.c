@@ -29,3 +29,7 @@ void CuLogWarn(const char* restrict fmt, ...) {
 void CuLogInfo(const char* restrict fmt, ...) {
     CU_SDL_LOG_MSG(SDL_LOG_PRIORITY_INFO);
 }
+
+void CuLogDebug(const char* restrict fmt, ...) {
+    CU_SDL_LOG_MSG(SDL_LOG_PRIORITY_DEBUG);
+}

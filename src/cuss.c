@@ -5,12 +5,71 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "cpu.h"
 #include "errors.h"
 #include "logger.h"
 #include "memory.h"
 #include "opdec.h"
+
+#define INVALID_ADDR 0xFFFFFFFFU
+#define MAX_ARG_VAL_SIZE 256
+
+typedef struct CuOptions {
+    bool info_req;
+    char mem_img[MAX_ARG_VAL_SIZE];
+    uint32_t break_point;
+} CuOptions;
+
+static void PrintUsage(const char* restrict prg) {
+    CuLogInfo("The Completely Useless System Simulator (CUSS).");
+    CuLogInfo("Usage: %s [options]", prg);
+    CuLogInfo("Options:");
+    CuLogInfo("  -h, --help: Show this help-message.");
+    CuLogInfo("  -b=<addr>, --break-point=<addr>: Break-point at <addr>.");
+    CuLogInfo("  -m=<file>, --memory-image=<file>: Load memory-image from "
+      "<file>.");
+}
+
+static bool ParseCommandLine(int argc, char *argv[], CuOptions* restrict opts,
+  CuError* restrict err) {
+    opts->info_req = false;
+    opts->mem_img[0] = '\0';
+    opts->break_point = INVALID_ADDR;
+    if (argc < 2) {
+        return true;
+    }
+
+    for (int i = 1; i < argc; i++) {
+        const char* arg = argv[i];
+
+        if (strncmp(arg, "-h", 2) == 0 || strncmp(arg, "--help", 6) == 0) {
+            opts->info_req = true;
+            PrintUsage(argv[0]);
+            return true;
+        }
+        if (strncmp(arg, "-b=", 3) == 0) {
+            opts->break_point = (uint32_t)strtoul(arg + 3, NULL, 0);
+            continue;
+        }
+        if (strncmp(arg, "--break-point=", 14) == 0) {
+            opts->break_point = (uint32_t)strtoul(arg + 14, NULL, 0);
+            continue;
+        }
+        if (strncmp(arg, "-m=", 3) == 0) {
+            strncpy(opts->mem_img, arg + 3, MAX_ARG_VAL_SIZE - 1);
+            continue;
+        }
+        if (strncmp(arg, "--memory-image=", 15) == 0) {
+            strncpy(opts->mem_img, arg + 15, MAX_ARG_VAL_SIZE - 1);
+            continue;
+        }
+
+        return CuErrMsg(err, "Unexpected argument '%s'.", arg);
+    }
+    return true;
+}
 
 static bool LogCpuState(CuError* restrict err) {
     const uint32_t pc = CuGetProgCtr();
@@ -64,20 +123,38 @@ static bool LogCpuState(CuError* restrict err) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        CuLogError("Invalid number of arguments.\n");
-        CuLogError("Usage: %s <memory-image>\n", argv[0]);
+    CuOptions opts;
+    CuError err;
+    if (!ParseCommandLine(argc, argv, &opts, &err)) {
+        CuLogError("Invalid arguments: %s", err.err_msg);
+        PrintUsage(argv[0]);
         return EXIT_FAILURE;
     }
+    if (opts.info_req) {
+        return EXIT_SUCCESS;
+    }
 
-    CuError err;
-    CuLogInfo("Loading memory-image from file '%s'...\n", argv[1]);
-    if (!CuInitMemFromFile(argv[1], &err)) {
-        CuLogError("Could not load '%s': %s\n", argv[1], err.err_msg);
+    if (strlen(opts.mem_img) == 0) {
+        CuLogError("Missing memory-image file.");
+        PrintUsage(argv[0]);
+        return EXIT_FAILURE;
+    }
+    CuLogInfo("Loading memory-image from file '%s'...\n", opts.mem_img);
+    if (!CuInitMemFromFile(opts.mem_img, &err)) {
+        CuLogError("Could not load memory-image file '%s': %s\n", opts.mem_img,
+          err.err_msg);
         return EXIT_FAILURE;
     }
 
     CuInitCpu();
+    if (opts.break_point != INVALID_ADDR) {
+        CuLogInfo("Adding a break-point at '%08" PRIx32 "'.", opts.break_point);
+        if (!CuAddBreakPoint(opts.break_point, &err)) {
+            CuLogError("Unable to add break-point: %s", err.err_msg);
+            return EXIT_FAILURE;
+        }
+    }
+
     do {
         if (!LogCpuState(&err)) {
             CuLogError("Could not log CPU-state: %s\n", err.err_msg);

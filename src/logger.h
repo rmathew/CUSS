@@ -6,5 +6,6 @@
 extern void CuLogError(const char* restrict fmt, ...);
 extern void CuLogWarn(const char* restrict fmt, ...);
 extern void CuLogInfo(const char* restrict fmt, ...);
+extern void CuLogDebug(const char* restrict fmt, ...);
 
 #endif  // CUSS_LOGGER_INCLUDED
