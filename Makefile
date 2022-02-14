@@ -14,6 +14,7 @@ VER = 0.1.0
 PRG = cuss
 
 SRCS = \
+       src/concur.c \
        src/cpu.c \
        src/cuss.c \
        src/errors.c \

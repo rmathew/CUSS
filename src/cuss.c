@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "concur.h"
 #include "cpu.h"
 #include "errors.h"
 #include "logger.h"
@@ -88,6 +89,17 @@ static bool CliPutMsg(const char* restrict msg, CuError* restrict err) {
     return true;
 }
 
+static int RunMonitor(void* data) {
+    (void)data;  // Suppress unused parameter warning.
+    CuError err;
+    bool quit = false;
+    if (!CuRunMon(&quit, &err)) {
+        CuLogError("Could not run the Monitor REPL: %s", err.err_msg);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     CuOptions opts;
     CuError err;
@@ -126,10 +138,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    bool quit = false;
-    if (!CuRunMon(&quit, &err)) {
-        CuLogError("Could not run the Monitor REPL: %s", err.err_msg);
+    CuLogInfo("Spawing Monitor in a separate thread.");
+    CuThread mon_thr;
+    if (!CuThrCreate(RunMonitor, "CUSS Monitor", /*data=*/NULL, &mon_thr,
+        &err)) {
+        CuLogError("Could not spawn a Monitor thread: %s", err.err_msg);
         return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
+    int mon_status;
+    CuThrWait(&mon_thr, &mon_status);
+    CuLogInfo("Monitor thread finished execution.");
+    return mon_status;
 }
