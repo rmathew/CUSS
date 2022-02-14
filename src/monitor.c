@@ -157,6 +157,9 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
         }
         if (strncmp(inp, "exit", 4) == 0 || strncmp(inp, "quit", 4) == 0) {
             *quit = true;
+            if (!CuSetCpuState(CU_CPU_QUITTING, err)) {
+                return false;
+            }
             return true;
         }
         if (strncmp(inp, "reg", 3) == 0) {
@@ -166,7 +169,7 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             continue;
         }
         if (strncmp(inp, "step", 4) == 0) {
-            if (!CuExecNextInsn(err)) {
+            if (!CuExecSingleStep(err)) {
                 return false;
             }
             if (!Disassemble(err)) {

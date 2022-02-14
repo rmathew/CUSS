@@ -3,7 +3,9 @@
 #include "cpu.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 
+#include "concur.h"
 #include "memory.h"
 #include "ops.h"
 
@@ -30,12 +32,15 @@ static uint32_t cup_pc;
 // The processor state register of a CUP core.
 static uint32_t cup_psr;
 
+// The current (or intended) state of a CUP core. Guarded by `cup_state_mut`.
 static CuCpuState cup_state = CU_CPU_ERROR;
+static CuMutex cup_state_mut = NULL;
+static CuCondVar cup_state_cv = NULL;
 
 static uint32_t cup_break_points[MAX_BREAK_POINTS];
 static int num_break_points = 0;
 
-void CuInitCpu(void) {
+bool CuInitCpu(CuError* restrict err) {
     cup_pc = RESET_VECTOR;
     cup_iregs[0] = 0x00000000U;
     for (int i = 1; i < CU_NUM_IREGS; i++) {
@@ -51,10 +56,35 @@ void CuInitCpu(void) {
 
     CuInitOps();
     cup_state = CU_CPU_PAUSED;
+
+    if (!CuMutCreate(&cup_state_mut, err)) {
+        return false;
+    }
+    if (!CuCondVarCreate(&cup_state_cv, err)) {
+        return false;
+    }
+    return true;
 }
 
 CuCpuState CuGetCpuState(void) {
     return cup_state;
+}
+
+bool CuSetCpuState(CuCpuState new_state, CuError* restrict err) {
+    if (new_state == CU_CPU_ERROR || new_state == CU_CPU_BREAK_POINT) {
+        return CuErrMsg(err, "Invalid new state.");
+    }
+    const bool must_unblock = (cup_state == CU_CPU_PAUSED) ||
+      (cup_state == CU_CPU_BREAK_POINT);
+    const bool can_unblock = (new_state == CU_CPU_RUNNING) ||
+      (new_state == CU_CPU_QUITTING);
+    if (must_unblock && can_unblock) {
+        if (!CuCondVarSignal(&cup_state_cv, err)) {
+            return false;
+        }
+    }
+    cup_state = new_state;
+    return true;
 }
 
 bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val, CuError* restrict err) {
@@ -129,6 +159,26 @@ void CuSetIntFlags(bool neg, bool ovf, bool car, bool zer) {
     }
 }
 
+static inline bool GetNextInsn(uint32_t* restrict insn, CuError* restrict err) {
+    CuError nerr;
+    if (!CuGetWordAt(cup_pc, insn, &nerr)) {
+        return CuErrMsg(err, "Error reading next instruction: %s",
+          nerr.err_msg);
+    }
+    return true;
+}
+
+static inline bool ExecOneInsn(CuError* restrict err) {
+    uint32_t insn;
+    if (!GetNextInsn(&insn, err)) {
+        return false;
+    }
+    if (!CuExecOp(cup_pc, insn, err)) {
+        return false;
+    }
+    return true;
+}
+
 static inline bool IsBreakPoint(uint32_t addr) {
     for (int i = 0; i < num_break_points; i++) {
         if (cup_break_points[i] == addr) {
@@ -138,41 +188,44 @@ static inline bool IsBreakPoint(uint32_t addr) {
     return false;
 }
 
-bool CuContinueExec(CuError* restrict err) {
+bool CuRunExecution(CuError* restrict err) {
+    cup_state = CU_CPU_RUNNING;
     do {
-        if (!CuExecNextInsn(err)) {
-            return false;
-        }
         if (IsBreakPoint(cup_pc)) {
             cup_state = CU_CPU_BREAK_POINT;
-            return true;
         }
-    } while (true);
-}
-
-static inline bool NextInsn(uint32_t* restrict insn, CuError* restrict err) {
-    CuError nerr;
-    if (!CuGetWordAt(cup_pc, insn, &nerr)) {
-        return CuErrMsg(err, "Error reading next instruction: %s",
-          nerr.err_msg);
-    }
+        if (cup_state == CU_CPU_BREAK_POINT || cup_state == CU_CPU_PAUSED) {
+            if (!CuMutLock(&cup_state_mut, err)) {
+                return false;
+            }
+            if (!CuCondVarWait(&cup_state_cv, &cup_state_mut, err)) {
+                return false;
+            }
+            if (!CuMutUnlock(&cup_state_mut, err)) {
+                return false;
+            }
+        }
+        if (!ExecOneInsn(err)) {
+            cup_state = CU_CPU_ERROR;
+            return false;
+        }
+    } while (cup_state != CU_CPU_QUITTING);
     return true;
 }
 
-bool CuExecNextInsn(CuError* restrict err) {
-    cup_state = CU_CPU_RUNNING;
-
-    uint32_t insn;
-    if (!NextInsn(&insn, err)) {
+bool CuExecSingleStep(CuError* restrict err) {
+    if (cup_state != CU_CPU_PAUSED && cup_state != CU_CPU_BREAK_POINT) {
+        return CuErrMsg(err, "Incorrect state for single-stepping.");
+    }
+    if (!ExecOneInsn(err)) {
         cup_state = CU_CPU_ERROR;
         return false;
     }
-    if (!CuExecOp(cup_pc, insn, err)) {
-        cup_state = CU_CPU_ERROR;
-        return false;
+    if (IsBreakPoint(cup_pc)) {
+        cup_state = CU_CPU_BREAK_POINT;
+    } else {
+        cup_state = CU_CPU_PAUSED;
     }
-
-    cup_state = CU_CPU_PAUSED;
     return true;
 }
 

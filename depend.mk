@@ -1,5 +1,6 @@
 src/concur.o: src/concur.c src/concur.h src/errors.h
-src/cpu.o: src/cpu.c src/cpu.h src/errors.h src/memory.h src/ops.h
+src/cpu.o: src/cpu.c src/cpu.h src/errors.h src/concur.h src/memory.h \
+ src/ops.h
 src/cuss.o: src/cuss.c src/concur.h src/errors.h src/cpu.h src/logger.h \
  src/memory.h src/monitor.h
 src/errors.o: src/errors.c src/errors.h

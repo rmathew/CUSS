@@ -100,6 +100,16 @@ static int RunMonitor(void* data) {
     return EXIT_SUCCESS;
 }
 
+static int RunExecutor(void* data) {
+    (void)data;  // Suppress unused parameter warning.
+    CuError err;
+    if (!CuRunExecution(&err)) {
+        CuLogError("Could not run the Simulator: %s", err.err_msg);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     CuOptions opts;
     CuError err;
@@ -129,7 +139,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    CuInitCpu();
+    if (!CuInitCpu(&err)) {
+        CuLogError("Could not initialize the CPU: %s", err.err_msg);
+        return EXIT_FAILURE;
+    }
     if (opts.break_point != INVALID_ADDR) {
         CuLogInfo("Adding a break-point at '%08" PRIx32 "'.", opts.break_point);
         if (!CuAddBreakPoint(opts.break_point, &err)) {
@@ -138,15 +151,30 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    CuLogInfo("Spawing Monitor in a separate thread.");
+    CuLogInfo("Spawning Monitor in a separate thread.");
     CuThread mon_thr;
     if (!CuThrCreate(RunMonitor, "CUSS Monitor", /*data=*/NULL, &mon_thr,
         &err)) {
         CuLogError("Could not spawn a Monitor thread: %s", err.err_msg);
         return EXIT_FAILURE;
     }
+
+    CuLogInfo("Spawning Executor in a separate thread.");
+    CuThread exe_thr;
+    if (!CuThrCreate(RunExecutor, "CUSS Executor", /*data=*/NULL, &exe_thr,
+        &err)) {
+        CuLogError("Could not spawn an Executor thread: %s", err.err_msg);
+        return EXIT_FAILURE;
+    }
+
     int mon_status;
     CuThrWait(&mon_thr, &mon_status);
-    CuLogInfo("Monitor thread finished execution.");
-    return mon_status;
+    CuLogInfo("Monitor thread finished execution (%d).", mon_status);
+
+    int exe_status;
+    CuThrWait(&exe_thr, &exe_status);
+    CuLogInfo("Executor thread finished execution (%d).", exe_status);
+
+    return (mon_status == EXIT_SUCCESS && exe_status == EXIT_SUCCESS) ?
+      EXIT_SUCCESS : EXIT_FAILURE;
 }

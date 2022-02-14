@@ -16,10 +16,12 @@ typedef enum {
     CU_CPU_PAUSED,
     CU_CPU_RUNNING,
     CU_CPU_BREAK_POINT,
+    CU_CPU_QUITTING,
 } CuCpuState;
 
-extern void CuInitCpu(void);
+extern bool CuInitCpu(CuError* restrict err);
 extern CuCpuState CuGetCpuState(void);
+extern bool CuSetCpuState(CuCpuState new_state, CuError* restrict err);
 
 extern bool CuGetIntReg(uint8_t r_n, uint32_t* restrict r_val,
   CuError* restrict err);
@@ -37,8 +39,8 @@ extern bool CuIsCarFlagSet(void);
 extern bool CuIsZerFlagSet(void);
 extern void CuSetIntFlags(bool neg, bool ovf, bool car, bool zer);
 
-extern bool CuContinueExec(CuError* restrict err);
-extern bool CuExecNextInsn(CuError* restrict err);
+extern bool CuRunExecution(CuError* restrict err);
+extern bool CuExecSingleStep(CuError* restrict err);
 
 extern bool CuAddBreakPoint(uint32_t addr, CuError* restrict err);
 extern bool CuRemoveBreakPoint(uint32_t addr, CuError* restrict err);
