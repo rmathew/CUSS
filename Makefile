@@ -19,6 +19,7 @@ SRCS = \
        src/errors.c \
        src/logger.c \
        src/memory.c \
+       src/monitor.c \
        src/opdec.c \
        src/ops.c \
 

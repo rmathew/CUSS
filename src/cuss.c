@@ -11,7 +11,7 @@
 #include "errors.h"
 #include "logger.h"
 #include "memory.h"
-#include "opdec.h"
+#include "monitor.h"
 
 #define INVALID_ADDR 0xFFFFFFFFU
 #define MAX_ARG_VAL_SIZE 256
@@ -71,54 +71,20 @@ static bool ParseCommandLine(int argc, char *argv[], CuOptions* restrict opts,
     return true;
 }
 
-static bool LogCpuState(CuError* restrict err) {
-    const uint32_t pc = CuGetProgCtr();
-
-    CuError nerr;
-    uint32_t insn;
-    if (!CuGetWordAt(pc, &insn, &nerr)) {
-        return CuErrMsg(err, "Error reading instruction: %s", nerr.err_msg);
+static bool CliGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
+  CuError* restrict err) {
+    if (fgets(buf, buf_size, stdin) == NULL) {
+        *eof = true;
+    } else {
+        *eof = false;
     }
+    return err != NULL;
+}
 
-#define MSG_BUF_SIZE 1024
-    char msg_buf[MSG_BUF_SIZE];
-
-    CuDecodeOp(insn, msg_buf, MSG_BUF_SIZE);
-    CuLogInfo("CPU-State: PC=%08" PRIx32 ", Insn@PC='%s'", pc, msg_buf);
-
-    char* buf_ptr = msg_buf;
-    int nc = 0;
-    for (int i = 0; i < CU_NUM_IREGS; i++) {
-        int np = 0;
-#define REGS_PER_LINE 8
-        if (i % REGS_PER_LINE == 0) {
-            np = snprintf(buf_ptr, MSG_BUF_SIZE - nc, "\n[r%02d-r%02d]:", i,
-              i + REGS_PER_LINE - 1);
-            nc += np + 1;
-        }
-#undef REGS_PER_LINE
-        if (nc >= MSG_BUF_SIZE) {
-            break;
-        }
-        buf_ptr += np;
-
-        uint32_t rval;
-        if (!CuGetIntReg(i, &rval, &nerr)) {
-            return CuErrMsg(err, "Error reading register %d: %s", i,
-              nerr.err_msg);
-        }
-        np = snprintf(buf_ptr, MSG_BUF_SIZE - nc - 1, " %08" PRIx32, rval);
-        nc += np + 1;
-        if (nc >= MSG_BUF_SIZE) {
-            break;
-        }
-        buf_ptr += np;
+static bool CliPutMsg(const char* restrict msg, CuError* restrict err) {
+    if (fputs(msg, stdout) == EOF) {
+        return CuErrMsg(err, "Error writing to `stdout`.");
     }
-    if (nc < (MSG_BUF_SIZE - 1)) {
-        msg_buf[nc++] = '\n';
-        msg_buf[nc++] = '\0';
-    }
-    CuLogInfo("Register-Values: %s", msg_buf);
     return true;
 }
 
@@ -139,10 +105,15 @@ int main(int argc, char *argv[]) {
         PrintUsage(argv[0]);
         return EXIT_FAILURE;
     }
-    CuLogInfo("Loading memory-image from file '%s'...\n", opts.mem_img);
+    CuLogInfo("Loading memory-image from file '%s'...", opts.mem_img);
     if (!CuInitMemFromFile(opts.mem_img, &err)) {
-        CuLogError("Could not load memory-image file '%s': %s\n", opts.mem_img,
+        CuLogError("Could not load memory-image file '%s': %s", opts.mem_img,
           err.err_msg);
+        return EXIT_FAILURE;
+    }
+
+    if (!CuMonSetUp(CliGetInp, CliPutMsg, &err)) {
+        CuLogError("Could not initialize the Monitor: %s", err.err_msg);
         return EXIT_FAILURE;
     }
 
@@ -155,20 +126,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    do {
-        if (!LogCpuState(&err)) {
-            CuLogError("Could not log CPU-state: %s\n", err.err_msg);
-            return EXIT_FAILURE;
-        }
-        CuLogInfo("Press ENTER to continue...");
-        fflush(stdout);
-        getchar();
-
-        if (!CuExecNextInsn(&err)) {
-            CuLogError("Execution-fault: %s\n", err.err_msg);
-            return EXIT_FAILURE;
-        }
-    } while (true);
-
+    bool quit = false;
+    if (!CuRunMon(&quit, &err)) {
+        CuLogError("Could not run the Monitor REPL: %s", err.err_msg);
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

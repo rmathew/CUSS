@@ -64,7 +64,7 @@
 
 // The type of a function to which the execution of a given instruction is
 // delegated using the dispatcher-table `cup_op_executors` below.
-typedef bool (*CuOpExecutor)(uint32_t, uint32_t, CuError* restrict);
+typedef bool (*CuOpExecutor)(uint32_t pc, uint32_t insn, CuError* restrict err);
 
 static CuOpExecutor cup_op_executors[NUM_OP0S];
 
