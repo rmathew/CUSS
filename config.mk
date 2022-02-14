@@ -28,7 +28,7 @@ OPT_FLAGS = -DNDEBUG -O3
 # file as the side-effect of compiling a ".c" file.
 #
 # WARNING: This only works with GCC and compilers that emulate its flags.
-MAK_FLAGS = -MT $(<:.c=.o) -MMD -MP
+MAK_FLAGS = -MT $(<:.c=.o) -MMD
 
 # Additional flags per source-file useful during development.
 DEV_FLAGS = $(MAK_FLAGS) -g1 -Werror -pedantic-errors
