@@ -169,11 +169,13 @@ int main(int argc, char *argv[]) {
 
     int mon_status;
     CuThrWait(&mon_thr, &mon_status);
-    CuLogInfo("Monitor thread finished execution (%d).", mon_status);
+    CuLogInfo("Monitor thread finished execution (%s).",
+      (mon_status == EXIT_SUCCESS) ? "SUCCESS" : "FAILURE");
 
     int exe_status;
     CuThrWait(&exe_thr, &exe_status);
-    CuLogInfo("Executor thread finished execution (%d).", exe_status);
+    CuLogInfo("Executor thread finished execution (%s).",
+      (exe_status == EXIT_SUCCESS) ? "SUCCESS" : "FAILURE");
 
     return (mon_status == EXIT_SUCCESS && exe_status == EXIT_SUCCESS) ?
       EXIT_SUCCESS : EXIT_FAILURE;

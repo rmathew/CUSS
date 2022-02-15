@@ -14,13 +14,6 @@
 static CuMonGetInpFn inp_fn = NULL;
 static CuMonPutMsgFn out_fn = NULL;
 
-#define TRY_OUTPUT(msg) \
-  do { \
-      if (!out_fn((msg), err)) { \
-          return false; \
-      } \
-  } while (false)
-
 bool CuMonSetUp(CuMonGetInpFn get_fn, CuMonPutMsgFn put_fn,
   CuError* restrict err) {
     if (get_fn == NULL) {
@@ -35,13 +28,13 @@ bool CuMonSetUp(CuMonGetInpFn get_fn, CuMonPutMsgFn put_fn,
 }
 
 static bool PrintUsage(CuError* restrict err) {
-    TRY_OUTPUT("Commands:\n");
-    TRY_OUTPUT("  .: Repeat last command.\n");
-    TRY_OUTPUT("  ?, help: Show available commands.\n");
-    TRY_OUTPUT("  dis: Disassemble code.\n");
-    TRY_OUTPUT("  exit, quit: Exit CUSS.\n");
-    TRY_OUTPUT("  reg: Print out register-values.\n");
-    TRY_OUTPUT("  step: Execute the next instruction.\n");
+    RET_ON_ERR(out_fn("Commands:\n", err));
+    RET_ON_ERR(out_fn("  .: Repeat last command.\n", err));
+    RET_ON_ERR(out_fn("  ?, help: Show available commands.\n", err));
+    RET_ON_ERR(out_fn("  dis: Disassemble code.\n", err));
+    RET_ON_ERR(out_fn("  exit, quit: Exit CUSS.\n", err));
+    RET_ON_ERR(out_fn("  reg: Print out register-values.\n", err));
+    RET_ON_ERR(out_fn("  step: Execute the next instruction.\n", err));
     return true;
 }
 
@@ -64,7 +57,7 @@ static bool Disassemble(CuError* restrict err) {
     snprintf(msg_buf, MSG_BUF_SIZE, "  %08" PRIx32 ": %s\n", pc, insn_buf);
 #undef MSG_BUF_SIZE
 
-    TRY_OUTPUT(msg_buf);
+    RET_ON_ERR(out_fn(msg_buf, err));
     return true;
 }
 
@@ -77,11 +70,11 @@ static bool PrintRegisters(CuError* restrict err) {
 #define REGS_PER_LINE 8
         if (i % REGS_PER_LINE == 0) {
             if (i != 0) {
-                TRY_OUTPUT("\n");
+                RET_ON_ERR(out_fn("\n", err));
             }
             snprintf(msg_buf, MSG_BUF_SIZE, "[r%02d-r%02d]:", i,
               i + REGS_PER_LINE - 1);
-            TRY_OUTPUT(msg_buf);
+            RET_ON_ERR(out_fn(msg_buf, err));
         }
 #undef REGS_PER_LINE
 
@@ -91,10 +84,10 @@ static bool PrintRegisters(CuError* restrict err) {
               nerr.err_msg);
         }
         snprintf(msg_buf, MSG_BUF_SIZE, " %08" PRIx32, rval);
-        TRY_OUTPUT(msg_buf);
+        RET_ON_ERR(out_fn(msg_buf, err));
     }
 #undef MSG_BUF_SIZE
-    TRY_OUTPUT("\n");
+    RET_ON_ERR(out_fn("\n", err));
 
     return true;
 }
@@ -106,8 +99,8 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
     if (quit == NULL) {
         return CuErrMsg(err, "NULL `quit`.");
     }
-    TRY_OUTPUT("                *** CUSS Monitor ***\n");
-    TRY_OUTPUT("(Enter 'help' to see the available commands.)\n");
+    RET_ON_ERR(out_fn("                *** CUSS Monitor ***\n", err));
+    RET_ON_ERR(out_fn("(Enter 'help' to see the available commands.)\n", err));
 
     *quit = false;
 #define MAX_USER_INPUT_SIZE 256
@@ -123,20 +116,20 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             rep_cmd = false;
         } else {
             strncpy(prev_inp, inp, MAX_USER_INPUT_SIZE);
-            TRY_OUTPUT("CUSS > ");
-            if (!inp_fn(inp, MAX_USER_INPUT_SIZE, &eof, err)) {
-                return false;
-            }
+            RET_ON_ERR(out_fn("CUSS > ", err));
+            RET_ON_ERR(inp_fn(inp, MAX_USER_INPUT_SIZE, &eof, err));
         }
 #undef MAX_USER_INPUT_SIZE
         if (eof) {
+            RET_ON_ERR(out_fn("\n-*- EOF -*-\n", err));
             *quit = true;
+            RET_ON_ERR(CuSetCpuState(CU_CPU_QUITTING, err));
             return true;
         }
 
         if (strncmp(inp, ".", 1) == 0) {
             if (prev_inp[0] == '\0') {
-                TRY_OUTPUT("ERROR: No previous command.\n");
+                RET_ON_ERR(out_fn("ERROR: No previous command.\n", err));
                 // TODO: Handle the case where the user now enters "." again.
             } else {
                 rep_cmd = true;
@@ -144,41 +137,29 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             continue;
         }
         if (strncmp(inp, "?", 1) == 0 || strncmp(inp, "help", 4) == 0) {
-            if (!PrintUsage(err)) {
-                return false;
-            }
+            RET_ON_ERR(PrintUsage(err));
             continue;
         }
         if (strncmp(inp, "dis", 3) == 0) {
-            if (!Disassemble(err)) {
-                return false;
-            }
+            RET_ON_ERR(Disassemble(err));
             continue;
         }
         if (strncmp(inp, "exit", 4) == 0 || strncmp(inp, "quit", 4) == 0) {
             *quit = true;
-            if (!CuSetCpuState(CU_CPU_QUITTING, err)) {
-                return false;
-            }
+            RET_ON_ERR(CuSetCpuState(CU_CPU_QUITTING, err));
             return true;
         }
         if (strncmp(inp, "reg", 3) == 0) {
-            if (!PrintRegisters(err)) {
-                return false;
-            }
+            RET_ON_ERR(PrintRegisters(err));
             continue;
         }
         if (strncmp(inp, "step", 4) == 0) {
-            if (!CuExecSingleStep(err)) {
-                return false;
-            }
-            if (!Disassemble(err)) {
-                return false;
-            }
+            RET_ON_ERR(CuExecSingleStep(err));
+            RET_ON_ERR(Disassemble(err));
             continue;
         }
         if (inp[0] != '\0') {
-            TRY_OUTPUT("ERROR: Unknown command.\n");
+            RET_ON_ERR(out_fn("ERROR: Unknown command.\n", err));
         }
     } while (!*quit);
 

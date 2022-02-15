@@ -31,9 +31,7 @@ bool CuIsValidPhyMemAddr(uint32_t addr, CuError* restrict err) {
 }
 
 bool CuGetByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err));
     if (val == NULL) {
         return CuErrMsg(err, "NULL fetch-location.");
     }
@@ -44,10 +42,8 @@ bool CuGetByteAt(uint32_t addr, uint8_t* restrict val, CuError* restrict err) {
 
 bool CuGetHalfWordAt(uint32_t addr, uint16_t* restrict val,
   CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err) ||
-      !CuIsValidPhyMemAddr(addr + 1U, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err) &&
+      CuIsValidPhyMemAddr(addr + 1U, err));
     if (val == NULL) {
         return CuErrMsg(err, "NULL fetch-location.");
     }
@@ -57,10 +53,8 @@ bool CuGetHalfWordAt(uint32_t addr, uint16_t* restrict val,
 }
 
 bool CuGetWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err) ||
-      !CuIsValidPhyMemAddr(addr + 3U, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err) &&
+      CuIsValidPhyMemAddr(addr + 3U, err));
     if (val == NULL) {
         return CuErrMsg(err, "NULL fetch-location.");
     }
@@ -70,18 +64,14 @@ bool CuGetWordAt(uint32_t addr, uint32_t* restrict val, CuError* restrict err) {
 }
 
 bool CuSetByteAt(uint32_t addr, uint8_t val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err));
     cuss_mem[addr] = val;
     return true;
 }
 
 bool CuSetHalfWordAt(uint32_t addr, uint16_t val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err) ||
-      !CuIsValidPhyMemAddr(addr + 1U, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err) &&
+      CuIsValidPhyMemAddr(addr + 1U, err));
     uint8_t* base = cuss_mem + addr;
     *base = (uint8_t)(val & 0x00FFU);
     *(base + 1) = (uint8_t)((val & 0xFF00U) >> 8);
@@ -89,10 +79,8 @@ bool CuSetHalfWordAt(uint32_t addr, uint16_t val, CuError* restrict err) {
 }
 
 bool CuSetWordAt(uint32_t addr, uint32_t val, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err) ||
-      !CuIsValidPhyMemAddr(addr + 3U, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err) &&
+      CuIsValidPhyMemAddr(addr + 3U, err));
     uint8_t* base = cuss_mem + addr;
     *base = (uint8_t)(val & 0x000000FFU);
     *(base + 1) = (uint8_t)((val & 0x0000FF00U) >> 8);

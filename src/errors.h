@@ -7,7 +7,14 @@
 
 #define MAX_ERR_MSG_SIZE (1 << 10)
 
-typedef struct {
+#define RET_ON_ERR(e) \
+  do { \
+      if (!(e)) { \
+          return false; \
+      } \
+  } while (false)
+
+typedef struct CuError {
     char err_msg[MAX_ERR_MSG_SIZE];
 } CuError;
 

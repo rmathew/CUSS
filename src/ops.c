@@ -40,28 +40,6 @@
 // The usual next value for the program-counter register.
 #define NEXT_PC(pc) ((pc) + sizeof(uint32_t))
 
-#define TRY_GET_IREG(reg, val, err) \
-  do { \
-    if (!CuGetIntReg((reg), (val), (err))) { \
-        return false; \
-    } \
-  } while(false)
-
-#define TRY_SET_IREG(reg, val, err) \
-  do { \
-    if (!CuSetIntReg((reg), (val), (err))) { \
-        return false; \
-    } \
-  } while(false)
-
-#define TRY_SET_PC(new_pc, err) \
-  do { \
-    if (!CuSetProgCtr((new_pc), (err))) { \
-        return false; \
-    } \
-  } while (false)
-
-
 // The type of a function to which the execution of a given instruction is
 // delegated using the dispatcher-table `cup_op_executors` below.
 typedef bool (*CuOpExecutor)(uint32_t pc, uint32_t insn, CuError* restrict err);
@@ -112,10 +90,10 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
     const uint8_t rt_num = GET_RT(insn);
 
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
 
     uint32_t rb_val;
-    TRY_GET_IREG(GET_RB(insn), &rb_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RB(insn), &rb_val, err));
 
     uint32_t new_pc = NEXT_PC(pc);
 
@@ -139,7 +117,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // Only consider bits 0-4 - there are only 32 bits in a register.
         rb_val &= 0x000000001FU;
         const uint32_t res = ra_val << rb_val;
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x01) {
             SetCpuIntFlags(res);
         }
@@ -166,7 +144,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
             mask <<= (32 - rb_val);
             res |= mask;
         }
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x03 || op1 == 0x05) {
             SetCpuIntFlags(res);
         }
@@ -178,7 +156,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // SLLI (0x06): Shift `ra` left logically using the `imm5` immediate.
         // SLIF (0x07): The same as SLLI, but sets the integer condition-flags.
         const uint32_t res = ra_val << GET_IMM5(insn);
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x07) {
             SetCpuIntFlags(res);
         }
@@ -203,7 +181,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
             mask <<= (32 - imm5);
             res |= mask;
         }
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x09 || op1 == 0x0b) {
             SetCpuIntFlags(res);
         }
@@ -215,7 +193,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // ANDR (0x0c): Bit-wise AND of `ra` and `rb` operands.
         // ADRF (0x0d): The same as ANDR, but sets the integer condition-flags.
         const uint32_t res = ra_val & rb_val;
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x0d) {
             SetCpuIntFlags(res);
         }
@@ -227,7 +205,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // ORRR (0x0e): Bit-wise OR of `ra` and `rb` operands.
         // ORRF (0x0f): The same as ORRR, but sets the integer condition-flags.
         const uint32_t res = ra_val | rb_val;
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x0f) {
             SetCpuIntFlags(res);
         }
@@ -239,7 +217,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // NOTR (0x10): Bit-wise NOT of `ra`.
         // NOTF (0x11): The same as NOTR, but sets the integer condition-flags.
         const uint32_t res = ~ra_val;
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x11) {
             SetCpuIntFlags(res);
         }
@@ -251,7 +229,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // XORR (0x12): Bit-wise XOR of `ra` and `rb` operands.
         // XORF (0x13): The same as XORR, but sets the integer condition-flags.
         const uint32_t res = ra_val ^ rb_val;
-        TRY_SET_IREG(rt_num, res, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, res, err));
         if (op1 == 0x13) {
             SetCpuIntFlags(res);
         }
@@ -263,7 +241,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // ADDR (0x14): Addition of `ra` and `rb` operands.
         // ADDF (0x15): The same as ADDR, but sets the integer condition-flags.
         const int64_t ext_prec_val = (int64_t)ra_val + (int64_t)rb_val;
-        TRY_SET_IREG(rt_num, ext_prec_val & 0xFFFFFFFFU, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err));
         if (op1 == 0x15) {
             SetCpuIntFlags(ext_prec_val);
         }
@@ -275,7 +253,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // SUBR (0x16): Subtraction of `ra` and `rb` operands.
         // SUBF (0x17): The same as SUBR, but sets the integer condition-flags.
         const int64_t ext_prec_val = (int64_t)ra_val - (int64_t)rb_val;
-        TRY_SET_IREG(rt_num, ext_prec_val & 0xFFFFFFFFU, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err));
         if (op1 == 0x17) {
             SetCpuIntFlags(ext_prec_val);
         }
@@ -287,7 +265,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         // MULR (0x18): Multiplication of `ra` and `rb` operands.
         // MULF (0x19): The same as MULR, but sets the integer condition-flags.
         const int64_t ext_prec_val = (int64_t)ra_val * (int64_t)rb_val;
-        TRY_SET_IREG(rt_num, ext_prec_val & 0xFFFFFFFFU, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err));
         CuSetExtPrecReg((ext_prec_val & 0xFFFFFFFF00000000U) >> 32);
         if (op1 == 0x19) {
             SetCpuIntFlags(ext_prec_val);
@@ -303,7 +281,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         epra <<= 32;
         epra |= ra_val;
         const int64_t ext_prec_val = epra / (int64_t)rb_val;
-        TRY_SET_IREG(rt_num, ext_prec_val & 0xFFFFFFFFU, err);
+        RET_ON_ERR(CuSetIntReg(rt_num, ext_prec_val & 0xFFFFFFFFU, err));
         CuSetExtPrecReg(epra % (int64_t)rb_val);
         if (op1 == 0x1b) {
             SetCpuIntFlags(ext_prec_val);
@@ -313,7 +291,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
 
       case 0x1c: {
         // RDEP (0x1c): Read `ep` into `rt`.
-        TRY_SET_IREG(rt_num, CuGetExtPrecReg(), err);
+        RET_ON_ERR(CuSetIntReg(rt_num, CuGetExtPrecReg(), err));
         break;
       }
 
@@ -331,7 +309,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
         res <<= GET_IMM5(insn);
         res += ra_val;  // Wrap-around semantics with over-/under-flow.
         if (op1 == 0x1f) {
-            TRY_SET_IREG(LINK_REG_NUM, NEXT_PC(pc), err);
+            RET_ON_ERR(CuSetIntReg(LINK_REG_NUM, NEXT_PC(pc), err));
         }
         new_pc = res;
         break;
@@ -343,7 +321,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
       }
     }
 
-    TRY_SET_PC(new_pc, err);
+    RET_ON_ERR(CuSetProgCtr(new_pc, err));
     return true;
 }
 
@@ -353,7 +331,7 @@ static bool CuExecOp0x00(uint32_t pc, uint32_t insn, CuError* restrict err) {
 static bool CuExecBoolImmOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
 
     uint32_t res = GET_IMM16(insn);
     switch (GET_OP0(insn)) {
@@ -369,24 +347,24 @@ static bool CuExecBoolImmOps(uint32_t pc, uint32_t insn,
         res ^= ra_val;
         break;
     }
-    TRY_SET_IREG(GET_RT(insn), res, err);
+    RET_ON_ERR(CuSetIntReg(GET_RT(insn), res, err));
     SetCpuIntFlags(res);
 
-    TRY_SET_PC(NEXT_PC(pc), err);
+    RET_ON_ERR(CuSetProgCtr(NEXT_PC(pc), err));
     return true;
 }
 
 // ADDI (0x04): Addition of `ra` with a sign-extended 16-bit immediate value.
 static bool CuExecAddImmOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
 
     int64_t ext_prec_val = GetSignExtImm16(insn);
     ext_prec_val += (int64_t)ra_val;
-    TRY_SET_IREG(GET_RT(insn), ext_prec_val & 0xFFFFFFFFU, err);
+    RET_ON_ERR(CuSetIntReg(GET_RT(insn), ext_prec_val & 0xFFFFFFFFU, err));
     SetCpuIntFlags(ext_prec_val);
 
-    TRY_SET_PC(NEXT_PC(pc), err);
+    RET_ON_ERR(CuSetProgCtr(NEXT_PC(pc), err));
     return true;
 }
 
@@ -398,9 +376,9 @@ static bool CuExecJmpOps(uint32_t pc, uint32_t insn, CuError* restrict err) {
     addr <<= 2;
     addr += pc;  // Wrap-around semantics with over-/under-flow.
     if (GET_OP0(insn) == 0x06) {
-        TRY_SET_IREG(LINK_REG_NUM, NEXT_PC(pc), err);
+        RET_ON_ERR(CuSetIntReg(LINK_REG_NUM, NEXT_PC(pc), err));
     }
-    TRY_SET_PC(addr, err);
+    RET_ON_ERR(CuSetProgCtr(addr, err));
     return true;
 }
 
@@ -412,7 +390,7 @@ static bool CuExecJmpOps(uint32_t pc, uint32_t insn, CuError* restrict err) {
 static bool CuExecFlagBranchOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     uint32_t rt_val;
-    TRY_GET_IREG(GET_RT(insn), &rt_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RT(insn), &rt_val, err));
 
     uint32_t addr = GetSignExtImm21(insn);
     addr <<= 2;
@@ -437,7 +415,7 @@ static bool CuExecFlagBranchOps(uint32_t pc, uint32_t insn,
         break;
     }
     const uint32_t new_pc = flag_set ?  addr : (NEXT_PC(pc));
-    TRY_SET_PC(new_pc, err);
+    RET_ON_ERR(CuSetProgCtr(new_pc, err));
     return true;
 }
 
@@ -447,10 +425,10 @@ static bool CuExecFlagBranchOps(uint32_t pc, uint32_t insn,
 static bool CuExecCmpBranchOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     uint32_t rt_val;
-    TRY_GET_IREG(GET_RT(insn), &rt_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RT(insn), &rt_val, err));
 
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
 
     uint32_t addr = GetSignExtImm16(insn);
     addr <<= 2;
@@ -467,15 +445,15 @@ static bool CuExecCmpBranchOps(uint32_t pc, uint32_t insn,
         break;
     }
     const uint32_t new_pc = cond_met ?  addr : (NEXT_PC(pc));
-    TRY_SET_PC(new_pc, err);
+    RET_ON_ERR(CuSetProgCtr(new_pc, err));
     return true;
 }
 
 // LDUI (0x0d): Load the upper 16 bits of `rt` using `imm16` (`ra` is ignored).
 static bool CuExecLoadUpImmOp(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
-    TRY_SET_IREG(GET_RT(insn), GET_IMM16(insn) << 16, err);
-    TRY_SET_PC(NEXT_PC(pc), err);
+    RET_ON_ERR(CuSetIntReg(GET_RT(insn), GET_IMM16(insn) << 16, err));
+    RET_ON_ERR(CuSetProgCtr(NEXT_PC(pc), err));
     return true;
 }
 
@@ -487,7 +465,7 @@ static bool CuExecLoadUpImmOp(uint32_t pc, uint32_t insn,
 static bool CuExecLoadMemOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
     // Wrap-around semantics with over-/under-flow.
     const uint32_t addr = ra_val + GetSignExtImm16(insn);
 
@@ -495,18 +473,14 @@ static bool CuExecLoadMemOps(uint32_t pc, uint32_t insn,
     const uint8_t op0 = GET_OP0(insn);
     switch (op0) {
       case 0x0e: {
-        if (!CuGetWordAt(addr, &rt_val, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuGetWordAt(addr, &rt_val, err));
         break;
       }
 
       case 0x0f:
       case 0x10: {
         uint16_t hw;
-        if (!CuGetHalfWordAt(addr, &hw, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuGetHalfWordAt(addr, &hw, err));
         rt_val = (uint32_t)hw;
         if (op0 == 0x0f && (hw & 0x8000U)) {
             rt_val |= 0xFFFF0000U;
@@ -519,9 +493,7 @@ static bool CuExecLoadMemOps(uint32_t pc, uint32_t insn,
       case 0x11:
       case 0x12: {
         uint8_t b;
-        if (!CuGetByteAt(addr, &b, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuGetByteAt(addr, &b, err));
         rt_val = (uint32_t)b;
         if (op0 == 0x11 && (b & 0x80U)) {
             rt_val |= 0xFFFFFF00U;
@@ -531,8 +503,8 @@ static bool CuExecLoadMemOps(uint32_t pc, uint32_t insn,
         break;
       }
     }
-    TRY_SET_IREG(GET_RT(insn), rt_val, err);
-    TRY_SET_PC(NEXT_PC(pc), err);
+    RET_ON_ERR(CuSetIntReg(GET_RT(insn), rt_val, err));
+    RET_ON_ERR(CuSetProgCtr(NEXT_PC(pc), err));
     return true;
 }
 
@@ -542,34 +514,28 @@ static bool CuExecLoadMemOps(uint32_t pc, uint32_t insn,
 static bool CuExecStoreMemOps(uint32_t pc, uint32_t insn,
   CuError* restrict err) {
     uint32_t ra_val;
-    TRY_GET_IREG(GET_RA(insn), &ra_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RA(insn), &ra_val, err));
     // Wrap-around semantics with over-/under-flow.
     const uint32_t addr = ra_val + GetSignExtImm16(insn);
 
     uint32_t rt_val;
-    TRY_GET_IREG(GET_RT(insn), &rt_val, err);
+    RET_ON_ERR(CuGetIntReg(GET_RT(insn), &rt_val, err));
 
     switch (GET_OP0(insn)) {
       case 0x13:
-        if (!CuSetWordAt(addr, rt_val, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuSetWordAt(addr, rt_val, err));
         break;
 
       case 0x14:
-        if (!CuSetHalfWordAt(addr, rt_val & 0x0000FFFFU, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuSetHalfWordAt(addr, rt_val & 0x0000FFFFU, err));
         break;
 
       case 0x15:
-        if (!CuSetByteAt(addr, rt_val & 0x000000FFU, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuSetByteAt(addr, rt_val & 0x000000FFU, err));
         break;
     }
 
-    TRY_SET_PC(NEXT_PC(pc), err);
+    RET_ON_ERR(CuSetProgCtr(NEXT_PC(pc), err));
     return true;
 }
 
@@ -645,8 +611,6 @@ void CuInitOps(void) {
 
 bool CuExecOp(uint32_t pc, uint32_t insn, CuError* restrict err) {
     const uint8_t op0 = GET_OP0(insn);
-    if (!cup_op_executors[op0](pc, insn, err)) {
-        return false;
-    }
+    RET_ON_ERR(cup_op_executors[op0](pc, insn, err));
     return true;
 }

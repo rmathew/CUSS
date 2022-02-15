@@ -57,12 +57,8 @@ bool CuInitCpu(CuError* restrict err) {
     CuInitOps();
     cup_state = CU_CPU_PAUSED;
 
-    if (!CuMutCreate(&cup_state_mut, err)) {
-        return false;
-    }
-    if (!CuCondVarCreate(&cup_state_cv, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuMutCreate(&cup_state_mut, err));
+    RET_ON_ERR(CuCondVarCreate(&cup_state_cv, err));
     return true;
 }
 
@@ -79,9 +75,7 @@ bool CuSetCpuState(CuCpuState new_state, CuError* restrict err) {
     const bool can_unblock = (new_state == CU_CPU_RUNNING) ||
       (new_state == CU_CPU_QUITTING);
     if (must_unblock && can_unblock) {
-        if (!CuCondVarSignal(&cup_state_cv, err)) {
-            return false;
-        }
+        RET_ON_ERR(CuCondVarSignal(&cup_state_cv, err));
     }
     cup_state = new_state;
     return true;
@@ -118,9 +112,7 @@ uint32_t CuGetProgCtr(void) {
 }
 
 bool CuSetProgCtr(uint32_t pc, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(pc, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(pc, err));
     if (pc & 0x00000003U) {
         return CuErrMsg(err, "Unaligned instruction (PC=%08" PRIx32 ").", pc);
     }
@@ -170,12 +162,8 @@ static inline bool GetNextInsn(uint32_t* restrict insn, CuError* restrict err) {
 
 static inline bool ExecOneInsn(CuError* restrict err) {
     uint32_t insn;
-    if (!GetNextInsn(&insn, err)) {
-        return false;
-    }
-    if (!CuExecOp(cup_pc, insn, err)) {
-        return false;
-    }
+    RET_ON_ERR(GetNextInsn(&insn, err));
+    RET_ON_ERR(CuExecOp(cup_pc, insn, err));
     return true;
 }
 
@@ -195,15 +183,9 @@ bool CuRunExecution(CuError* restrict err) {
             cup_state = CU_CPU_BREAK_POINT;
         }
         if (cup_state == CU_CPU_BREAK_POINT || cup_state == CU_CPU_PAUSED) {
-            if (!CuMutLock(&cup_state_mut, err)) {
-                return false;
-            }
-            if (!CuCondVarWait(&cup_state_cv, &cup_state_mut, err)) {
-                return false;
-            }
-            if (!CuMutUnlock(&cup_state_mut, err)) {
-                return false;
-            }
+            RET_ON_ERR(CuMutLock(&cup_state_mut, err));
+            RET_ON_ERR(CuCondVarWait(&cup_state_cv, &cup_state_mut, err));
+            RET_ON_ERR(CuMutUnlock(&cup_state_mut, err));
         }
         if (!ExecOneInsn(err)) {
             cup_state = CU_CPU_ERROR;
@@ -230,9 +212,7 @@ bool CuExecSingleStep(CuError* restrict err) {
 }
 
 bool CuAddBreakPoint(uint32_t addr, CuError* restrict err) {
-    if (!CuIsValidPhyMemAddr(addr, err)) {
-        return false;
-    }
+    RET_ON_ERR(CuIsValidPhyMemAddr(addr, err));
     for (int i = 0; i < MAX_BREAK_POINTS; i++) {
         if (cup_break_points[i] == INVALID_BREAK_POINT) {
             cup_break_points[i] = addr;
