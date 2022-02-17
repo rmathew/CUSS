@@ -3,6 +3,7 @@
 #include "monitor.h"
 
 #include <inttypes.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -92,6 +93,11 @@ static bool PrintRegisters(CuError* restrict err) {
     return true;
 }
 
+static inline bool EqualsStr(const char* restrict s1, const char* restrict s2) {
+    const size_t s2_len = strlen(s2);
+    return strncmp(s1, s2, s2_len) == 0 && strlen(s1) == s2_len;
+}
+
 bool CuRunMon(bool* restrict quit, CuError* restrict err) {
     if (inp_fn == NULL || out_fn == NULL) {
         return CuErrMsg(err, "Monitor not initialized.");
@@ -127,7 +133,7 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             return true;
         }
 
-        if (strncmp(inp, ".", 1) == 0) {
+        if (EqualsStr(inp, ".")) {
             if (prev_inp[0] == '\0') {
                 RET_ON_ERR(out_fn("ERROR: No previous command.\n", err));
                 // TODO: Handle the case where the user now enters "." again.
@@ -136,24 +142,24 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             }
             continue;
         }
-        if (strncmp(inp, "?", 1) == 0 || strncmp(inp, "help", 4) == 0) {
+        if (EqualsStr(inp, "?") || EqualsStr(inp, "help")) {
             RET_ON_ERR(PrintUsage(err));
             continue;
         }
-        if (strncmp(inp, "dis", 3) == 0) {
+        if (EqualsStr(inp, "dis")) {
             RET_ON_ERR(Disassemble(err));
             continue;
         }
-        if (strncmp(inp, "exit", 4) == 0 || strncmp(inp, "quit", 4) == 0) {
+        if (EqualsStr(inp, "exit") || EqualsStr(inp, "quit")) {
             *quit = true;
             RET_ON_ERR(CuSetCpuState(CU_CPU_QUITTING, err));
             return true;
         }
-        if (strncmp(inp, "reg", 3) == 0) {
+        if (EqualsStr(inp, "reg")) {
             RET_ON_ERR(PrintRegisters(err));
             continue;
         }
-        if (strncmp(inp, "step", 4) == 0) {
+        if (EqualsStr(inp, "step")) {
             RET_ON_ERR(CuExecSingleStep(err));
             RET_ON_ERR(Disassemble(err));
             continue;
