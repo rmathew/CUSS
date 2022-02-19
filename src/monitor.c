@@ -93,11 +93,6 @@ static bool PrintRegisters(CuError* restrict err) {
     return true;
 }
 
-static inline bool EqualsStr(const char* restrict s1, const char* restrict s2) {
-    const size_t s2_len = strlen(s2);
-    return strncmp(s1, s2, s2_len) == 0 && strlen(s1) == s2_len;
-}
-
 bool CuRunMon(bool* restrict quit, CuError* restrict err) {
     if (inp_fn == NULL || out_fn == NULL) {
         return CuErrMsg(err, "Monitor not initialized.");
@@ -112,16 +107,18 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
 #define MAX_USER_INPUT_SIZE 256
     char inp[MAX_USER_INPUT_SIZE];
     inp[0] = '\0';
-    char prev_inp[MAX_USER_INPUT_SIZE];
-    prev_inp[0] = '\0';
+    char prev_cmd[MAX_USER_INPUT_SIZE];
+    prev_cmd[0] = '\0';
     bool rep_cmd = false;
     do {
         bool eof = false;
         if (rep_cmd) {
-            strncpy(inp, prev_inp, MAX_USER_INPUT_SIZE);
+            strncpy(inp, prev_cmd, MAX_USER_INPUT_SIZE);
             rep_cmd = false;
         } else {
-            strncpy(prev_inp, inp, MAX_USER_INPUT_SIZE);
+            if (inp[0] != '.') {
+                strncpy(prev_cmd, inp, MAX_USER_INPUT_SIZE);
+            }
             RET_ON_ERR(out_fn("CUSS > ", err));
             RET_ON_ERR(inp_fn(inp, MAX_USER_INPUT_SIZE, &eof, err));
         }
@@ -133,33 +130,35 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             return true;
         }
 
-        if (EqualsStr(inp, ".")) {
-            if (prev_inp[0] == '\0') {
+        if (strcmp(inp, ".") == 0) {
+            if (prev_cmd[0] == '\0') {
                 RET_ON_ERR(out_fn("ERROR: No previous command.\n", err));
-                // TODO: Handle the case where the user now enters "." again.
             } else {
+                RET_ON_ERR(out_fn(">>> ", err));
+                RET_ON_ERR(out_fn(prev_cmd, err));
+                RET_ON_ERR(out_fn("\n", err));
                 rep_cmd = true;
             }
             continue;
         }
-        if (EqualsStr(inp, "?") || EqualsStr(inp, "help")) {
+        if (strcmp(inp, "?") == 0 || strcmp(inp, "help") == 0) {
             RET_ON_ERR(PrintUsage(err));
             continue;
         }
-        if (EqualsStr(inp, "dis")) {
+        if (strcmp(inp, "dis") == 0) {
             RET_ON_ERR(Disassemble(err));
             continue;
         }
-        if (EqualsStr(inp, "exit") || EqualsStr(inp, "quit")) {
+        if (strcmp(inp, "exit") == 0 || strcmp(inp, "quit") == 0) {
             *quit = true;
             RET_ON_ERR(CuSetCpuState(CU_CPU_QUITTING, err));
             return true;
         }
-        if (EqualsStr(inp, "reg")) {
+        if (strcmp(inp, "reg") == 0) {
             RET_ON_ERR(PrintRegisters(err));
             continue;
         }
-        if (EqualsStr(inp, "step")) {
+        if (strcmp(inp, "step") == 0) {
             RET_ON_ERR(CuExecSingleStep(err));
             RET_ON_ERR(Disassemble(err));
             continue;

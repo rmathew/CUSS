@@ -52,32 +52,21 @@ static bool ParseCommandLine(int argc, char *argv[], CuOptions* restrict opts) {
     for (int i = 1; i < argc; i++) {
         const char* arg = argv[i];
 
-        if (strncmp(arg, "-h", 2) == 0 && strlen(arg) == 2) {
-            opts->info_req = true;
-            PrintUsage(argv[0]);
-            return true;
-        }
-        if (strncmp(arg, "--help", 6) == 0 && strlen(arg) == 6) {
+        if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             opts->info_req = true;
             PrintUsage(argv[0]);
             return true;
         }
 
-        if (strncmp(arg, "-b=", 3) == 0) {
+        if (strncmp(arg, "-b=", 3) == 0 ||
+          strncmp(arg, "--break-point=", 14) == 0) {
             opts->break_point = (uint32_t)strtoul(arg + 3, NULL, 0);
             continue;
         }
-        if (strncmp(arg, "--break-point=", 14) == 0) {
-            opts->break_point = (uint32_t)strtoul(arg + 14, NULL, 0);
-            continue;
-        }
 
-        if (strncmp(arg, "-m=", 3) == 0) {
+        if (strncmp(arg, "-m=", 3) == 0 ||
+          strncmp(arg, "--memory-image=", 15) == 0) {
             strncpy(opts->mem_img, arg + 3, MAX_ARG_VAL_SIZE - 1);
-            continue;
-        }
-        if (strncmp(arg, "--memory-image=", 15) == 0) {
-            strncpy(opts->mem_img, arg + 15, MAX_ARG_VAL_SIZE - 1);
             continue;
         }
 
