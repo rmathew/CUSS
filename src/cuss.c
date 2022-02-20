@@ -14,6 +14,7 @@
 #include "logger.h"
 #include "memory.h"
 #include "monitor.h"
+#include "sdlui.h"
 
 #define INVALID_ADDR 0xFFFFFFFFU
 #define MAX_ARG_VAL_SIZE 256
@@ -27,6 +28,7 @@
 
 typedef struct CuOptions {
     bool info_req;
+    bool sdl_ui;
     char mem_img[MAX_ARG_VAL_SIZE];
     uint32_t break_point;
 } CuOptions;
@@ -39,10 +41,27 @@ static void PrintUsage(const char* restrict prg) {
     CuLogInfo("  -b=<addr>, --break-point=<addr>: Break-point at <addr>.");
     CuLogInfo("  -m=<file>, --memory-image=<file>: Load memory-image from "
       "<file>.");
+    CuLogInfo("  -u=<ui>, --user-interface=<ui>: Use the <ui> user-interface.");
+    CuLogInfo("    (<ui> must be 'sdl' or 'cli' - the default is 'cli'.)");
+}
+
+static bool ParseUiArg(const char* restrict prg, const char* restrict arg,
+  CuOptions* restrict opts) {
+    if (strcmp(arg, "sdl") == 0) {
+        opts->sdl_ui = true;
+    } else if (strcmp(arg, "cli") == 0) {
+        opts->sdl_ui = false;
+    } else {
+        CuLogError("Invalid user-interface '%s'.", arg);
+        PrintUsage(prg);
+        return false;
+    }
+    return true;
 }
 
 static bool ParseCommandLine(int argc, char *argv[], CuOptions* restrict opts) {
     opts->info_req = false;
+    opts->sdl_ui = false;
     opts->mem_img[0] = '\0';
     opts->break_point = INVALID_ADDR;
     if (argc < 2) {
@@ -50,27 +69,43 @@ static bool ParseCommandLine(int argc, char *argv[], CuOptions* restrict opts) {
     }
 
     for (int i = 1; i < argc; i++) {
-        const char* arg = argv[i];
+        const char* restrict arg = argv[i];
 
         if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             opts->info_req = true;
             PrintUsage(argv[0]);
             return true;
         }
-
-        if (strncmp(arg, "-b=", 3) == 0 ||
-          strncmp(arg, "--break-point=", 14) == 0) {
+        if (strncmp(arg, "-b=", 3) == 0) {
             opts->break_point = (uint32_t)strtoul(arg + 3, NULL, 0);
             continue;
         }
-
-        if (strncmp(arg, "-m=", 3) == 0 ||
-          strncmp(arg, "--memory-image=", 15) == 0) {
+        if (strncmp(arg, "--break-point=", 14) == 0) {
+            opts->break_point = (uint32_t)strtoul(arg + 14, NULL, 0);
+            continue;
+        }
+        if (strncmp(arg, "-m=", 3) == 0) {
             strncpy(opts->mem_img, arg + 3, MAX_ARG_VAL_SIZE - 1);
             continue;
         }
+        if (strncmp(arg, "--memory-image=", 15) == 0) {
+            strncpy(opts->mem_img, arg + 15, MAX_ARG_VAL_SIZE - 1);
+            continue;
+        }
+        if (strncmp(arg, "-u=", 3) == 0) {
+          if (!ParseUiArg(argv[0], arg + 3, opts)) {
+              return false;
+          }
+          continue;
+        }
+        if (strncmp(arg, "--user-interface=", 17) == 0) {
+          if (!ParseUiArg(argv[0], arg + 17, opts)) {
+              return false;
+          }
+          continue;
+        }
 
-        CuLogError("Unexpected argument '%s'.", arg);
+        CuLogError("Invalid argument '%s'.", arg);
         PrintUsage(argv[0]);
         return false;
     }
@@ -145,9 +180,13 @@ static int RunMonitor(void* data) {
     return EXIT_SUCCESS;
 }
 
-static bool MonitorSetUp(CuThread* restrict mon_thr) {
+static bool MonitorSetUp(const CuOptions* restrict opts,
+  CuThread* restrict mon_thr) {
+    CuMonGetInpFn inp_fn = opts->sdl_ui ? CuSdlGetMonInp : CliGetInp;
+    CuMonPutMsgFn out_fn = opts->sdl_ui ? CuSdlPutMonMsg : CliPutMsg;
+
     CuError err;
-    if (!CuMonSetUp(CliGetInp, CliPutMsg, &err)) {
+    if (!CuMonSetUp(inp_fn, out_fn, &err)) {
         CuLogError("Could not initialize the Monitor: %s", err.err_msg);
         return false;
     }
@@ -209,10 +248,24 @@ int main(int argc, char *argv[]) {
     RET_FAIL_ON_ERR(MemorySetUp(&opts, argv[0]));
     RET_FAIL_ON_ERR(CpuSetUp(&opts));
 
+    if (opts.sdl_ui) {
+        CuLogInfo("Using SDL UI.");
+        CuError err;
+        RET_FAIL_ON_ERR(CuSdlUiSetUp(&err));
+    } else {
+        CuLogInfo("Using CLI UI.");
+    }
+
     CuThread mon_thr;
-    RET_FAIL_ON_ERR(MonitorSetUp(&mon_thr));
+    RET_FAIL_ON_ERR(MonitorSetUp(&opts, &mon_thr));
     CuThread exe_thr;
     RET_FAIL_ON_ERR(ExecutorSetUp(&exe_thr));
+
+    if (opts.sdl_ui) {
+        CuError err;
+        RET_FAIL_ON_ERR(CuSdlUiRunEventLoop(&err));
+        CuSdlUiTearDown();
+    }
 
     RET_FAIL_ON_ERR(ExecutorTearDown(&exe_thr));
     RET_FAIL_ON_ERR(MonitorTearDown(&mon_thr));

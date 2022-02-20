@@ -23,6 +23,8 @@ SRCS = \
        src/monitor.c \
        src/opdec.c \
        src/ops.c \
+       src/sdltxt.c \
+       src/sdlui.c \
 
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
