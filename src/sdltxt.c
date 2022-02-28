@@ -3,7 +3,6 @@
 #include "sdltxt.h"
 
 #include "SDL_error.h"
-#include <stddef.h>
 
 #define VGA_FONT_CHARS 256U
 #define VGA_FONT_WIDTH 8U
@@ -866,7 +865,7 @@ bool CuSdlTxtSetColor(const SDL_Color* restrict clr, CuError* restrict err) {
     return true;
 }
 
-bool CuSdlTxtRenderByte(SDL_Surface* restrict screen,
+static inline bool RenderByte(SDL_Surface* restrict screen,
   const SDL_Point* restrict pos, uint8_t byt, CuError* restrict err) {
     SDL_Rect src = {.x = (int)byt * VGA_FONT_WIDTH, .y = 0, .w = VGA_FONT_WIDTH,
         .h = VGA_FONT_HEIGHT};
@@ -878,13 +877,22 @@ bool CuSdlTxtRenderByte(SDL_Surface* restrict screen,
     return true;
 }
 
-bool CuSdlTxtRender(SDL_Surface* restrict screen,
-  const SDL_Point* restrict pos, const char* restrict txt,
+bool CuSdlTxtRenderByteSeq(SDL_Surface* restrict screen,
+  const SDL_Point* restrict pos, const uint8_t* restrict seq, size_t n,
   CuError* restrict err) {
+    if (screen == NULL) {
+        return CuErrMsg(err, "NULL `screen` argument.");
+    }
+    if (pos == NULL) {
+        return CuErrMsg(err, "NULL `pos` argument.");
+    }
+    if (seq == NULL || n == 0 || pos->y > screen->h) {
+        return true;
+    }
+
     SDL_Point cpos = {.x = pos->x, .y = pos->y};
-    unsigned char c;
-    while ((c = *txt++) != '\0') {
-        RET_ON_ERR(CuSdlTxtRenderByte(screen, &cpos, c, err));
+    for (size_t i = 0U; i < n && cpos.x < screen->w; i++) {
+        RET_ON_ERR(RenderByte(screen, &cpos, seq[i], err));
         cpos.x += VGA_FONT_WIDTH;
     }
     return true;

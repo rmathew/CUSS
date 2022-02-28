@@ -11,10 +11,6 @@
 extern bool CuSdlUiSetUp(CuError* restrict err);
 extern bool CuSdlUiTearDown(void);
 
-extern bool CuSdlGetMonInp(char* restrict buf, size_t buf_size,
-  bool* restrict eof, CuError* restrict err);
-extern bool CuSdlPutMonMsg(const char* restrict msg, CuError* restrict err);
-
 extern bool CuSdlUiRunEventLoop(CuError* restrict err);
 
 #endif  // CUSS_SDLUI_INCLUDED

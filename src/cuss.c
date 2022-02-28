@@ -14,6 +14,7 @@
 #include "logger.h"
 #include "memory.h"
 #include "monitor.h"
+#include "sdlmonio.h"
 #include "sdlui.h"
 
 #define INVALID_ADDR 0xFFFFFFFFU
@@ -148,7 +149,9 @@ static bool CpuSetUp(const CuOptions* restrict opts) {
 
 static bool CliGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
   CuError* restrict err) {
-    (void)err;  // Suppress unused parameter warning.
+    if (buf == NULL) {
+        return CuErrMsg(err, "NULL `buf` argument.");
+    }
     if (fgets(buf, buf_size, stdin) == NULL) {
         *eof = true;
     } else {
@@ -163,6 +166,9 @@ static bool CliGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
 }
 
 static bool CliPutMsg(const char* restrict msg, CuError* restrict err) {
+    if (msg == NULL) {
+        return CuErrMsg(err, "NULL `msg` argument.");
+    }
     if (fputs(msg, stdout) == EOF) {
         return CuErrMsg(err, "Error writing to `stdout`.");
     }
@@ -182,8 +188,8 @@ static int RunMonitor(void* data) {
 
 static bool MonitorSetUp(const CuOptions* restrict opts,
   CuThread* restrict mon_thr) {
-    CuMonGetInpFn inp_fn = opts->sdl_ui ? CuSdlGetMonInp : CliGetInp;
-    CuMonPutMsgFn out_fn = opts->sdl_ui ? CuSdlPutMonMsg : CliPutMsg;
+    CuMonGetInpFn inp_fn = opts->sdl_ui ? CuSdlMonIoGetInp : CliGetInp;
+    CuMonPutMsgFn out_fn = opts->sdl_ui ? CuSdlMonIoPutMsg : CliPutMsg;
 
     CuError err;
     if (!CuMonSetUp(inp_fn, out_fn, &err)) {

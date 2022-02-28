@@ -23,6 +23,7 @@ SRCS = \
        src/monitor.c \
        src/opdec.c \
        src/ops.c \
+       src/sdlmonio.c \
        src/sdltxt.c \
        src/sdlui.c \
 

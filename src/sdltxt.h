@@ -7,6 +7,7 @@
 #include "SDL_rect.h"
 #include "SDL_surface.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "errors.h"
@@ -21,11 +22,8 @@ extern int CuSdlTxtHeight();
 extern bool CuSdlTxtSetColor(const SDL_Color* restrict clr,
   CuError* restrict err);
 
-extern bool CuSdlTxtRenderByte(SDL_Surface* restrict screen,
-  const SDL_Point* restrict pos, uint8_t byt, CuError* restrict err);
-
-extern bool CuSdlTxtRender(SDL_Surface* restrict screen,
-  const SDL_Point* restrict pos, const char* restrict txt,
+extern bool CuSdlTxtRenderByteSeq(SDL_Surface* restrict screen,
+  const SDL_Point* restrict pos, const uint8_t* restrict seq, size_t n,
   CuError* restrict err);
 
 #endif  // CUSS_SDLTXT_INCLUDED

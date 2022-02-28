@@ -7,10 +7,10 @@
 // header-files. Thus we cannot help but bloat this translation-unit.
 #include "SDL.h"
 #include <stdint.h>
-#include <stdlib.h>
 
-#include "sdltxt.h"
 #include "logger.h"
+#include "sdlmonio.h"
+#include "sdltxt.h"
 
 #define TARGET_FPS 60
 #define MAX_FRAME_TIMES 256
@@ -32,15 +32,11 @@ static SDL_Renderer* renderer = NULL;
 static SDL_Surface* screen = NULL;
 static SDL_Texture* screen_texture = NULL;
 
+static bool is_monitor_active = true;  // TODO: Set it correctly.
+
 static struct FrameTimes frame_times[MAX_FRAME_TIMES];
 static int curr_frame = 0;
 static uint64_t min_ctr_per_frame = 0LLU;
-
-static inline uint64_t PerfCtrDeltaToMs(uint64_t delta) {
-#define MILLIS_PER_SEC 1000LLU
-    return delta * MILLIS_PER_SEC / SDL_GetPerformanceFrequency();
-#undef MILLIS_PER_SEC
-}
 
 static void TryToSetSdlHint(const char* restrict name,
   const char* restrict value) {
@@ -191,7 +187,14 @@ bool CuSdlUiSetUp(CuError* restrict err) {
     curr_frame = 0;
 
     RET_ON_ERR(CuSdlTxtSetUp(screen->format, err));
+    RET_ON_ERR(CuSdlMonIoSetUp(SCR_WIDTH, SCR_HEIGHT, err));
     return true;
+}
+
+static inline uint64_t PerfCtrDeltaToMs(uint64_t delta) {
+#define MILLIS_PER_SEC 1000LLU
+    return delta * MILLIS_PER_SEC / SDL_GetPerformanceFrequency();
+#undef MILLIS_PER_SEC
 }
 
 static void PrintRenderTimings(void) {
@@ -223,6 +226,7 @@ static void PrintRenderTimings(void) {
 bool CuSdlUiTearDown(void) {
     PrintRenderTimings();
 
+    CuSdlMonIoTearDown();
     CuSdlTxtTearDown();
 
     SDL_DestroyTexture(screen_texture);
@@ -242,12 +246,9 @@ bool CuSdlUiTearDown(void) {
 static bool RenderFrame(CuError* restrict err) {
     const uint64_t t0 = SDL_GetPerformanceCounter();
 
-    SDL_FillRect(screen, /*rect=*/NULL,
-      SDL_MapRGBA(screen->format, 32, 32, 32, 255));
-
-    // TODO: Render the contents of the video-memory or the monitor, as
-    // appropriate.
-    (void)err;  // Silence unused variable warnings for now.
+    if (is_monitor_active) {
+        RET_ON_ERR(CuSdlMonIoRender(screen, err));
+    }
     const uint64_t t_draw = SDL_GetPerformanceCounter();
 
     SDL_UpdateTexture(screen_texture, /*rect=*/NULL, screen->pixels,
@@ -273,23 +274,6 @@ static bool RenderFrame(CuError* restrict err) {
     return true;
 }
 
-bool CuSdlGetMonInp(char* restrict buf, size_t buf_size,
-  bool* restrict eof, CuError* restrict err) {
-    // TODO: Implement this.
-    (void)buf;  // Avoid unused variable warning for now.
-    (void)buf_size;  // Avoid unused variable warning for now.
-    (void)err;  // Avoid unused variable warning for now.
-    *eof = true;
-    return true;
-}
-
-bool CuSdlPutMonMsg(const char* restrict msg, CuError* restrict err) {
-    // TODO: Implement this.
-    (void)msg;  // Avoid unused variable warning for now.
-    (void)err;  // Avoid unused variable warning for now.
-    return true;
-}
-
 bool CuSdlUiRunEventLoop(CuError* restrict err) {
     bool quit = false;
     while (!quit) {
@@ -305,6 +289,14 @@ bool CuSdlUiRunEventLoop(CuError* restrict err) {
               case SDL_KEYUP:
                 if (evt.key.keysym.sym == SDLK_ESCAPE) {
                     quit = true;
+                } else if (is_monitor_active) {
+                    RET_ON_ERR(CuSdlMonProcEvt(&evt, err));
+                }
+                break;
+
+              case SDL_TEXTINPUT:
+                if (is_monitor_active) {
+                    RET_ON_ERR(CuSdlMonProcEvt(&evt, err));
                 }
                 break;
 

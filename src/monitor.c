@@ -73,7 +73,7 @@ static bool PrintRegisters(CuError* restrict err) {
             if (i != 0) {
                 RET_ON_ERR(out_fn("\n", err));
             }
-            snprintf(msg_buf, MSG_BUF_SIZE, "[r%02d-r%02d]:", i,
+            snprintf(msg_buf, MSG_BUF_SIZE, "r%02d-r%02d:", i,
               i + REGS_PER_LINE - 1);
             RET_ON_ERR(out_fn(msg_buf, err));
         }
@@ -104,7 +104,7 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
     RET_ON_ERR(out_fn("(Enter 'help' to see the available commands.)\n", err));
 
     *quit = false;
-#define MAX_USER_INPUT_SIZE 256
+#define MAX_USER_INPUT_SIZE 128
     char inp[MAX_USER_INPUT_SIZE];
     inp[0] = '\0';
     char prev_cmd[MAX_USER_INPUT_SIZE];
@@ -164,7 +164,9 @@ bool CuRunMon(bool* restrict quit, CuError* restrict err) {
             continue;
         }
         if (inp[0] != '\0') {
-            RET_ON_ERR(out_fn("ERROR: Unknown command.\n", err));
+            char buf[256];
+            snprintf(buf, sizeof buf, "ERROR: Unknown command '%s'.\n", inp);
+            RET_ON_ERR(out_fn(buf, err));
         }
     } while (!*quit);
 
