@@ -58,8 +58,7 @@ care of.
 
 ### GUI
 
-* Remove the extra column emitted when the output is 80 columns wide.
-* Make scrolling of text work as expected.
+* Fix segmentation-fault on too much input.
 * Fix dangling CUSS on `quit`.
 * Fix dangling CUSS on ESC.
 * Only redraw portions of the display that actually need to be redrawn.

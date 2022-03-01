@@ -21,7 +21,7 @@
 
 static char mon_inp_buf[MAX_MON_INP];
 static uint8_t* mon_out_buf = NULL;
-static int mon_top_row = 0;
+static int mon_init_row = 0;
 static int mon_curr_row = 0;
 static int mon_curr_col = 0;
 static int mon_max_rows = 0;
@@ -41,7 +41,7 @@ bool CuSdlMonIoSetUp(int scr_width, int scr_height, CuError* restrict err) {
     if (mon_out_buf == NULL) {
         return CuErrMsg(err, "Unable to allocate Monitor text-buffer.");
     }
-    mon_top_row = 0;
+    mon_init_row = 0;
     mon_curr_row = 0;
     mon_curr_col = 0;
 
@@ -63,7 +63,7 @@ void CuSdlMonIoTearDown(void) {
 
     mon_inp_buf[0] = '\0';
     free(mon_out_buf);
-    mon_top_row = 0;
+    mon_init_row = 0;
     mon_curr_row = 0;
     mon_curr_col = 0;
 
@@ -78,9 +78,16 @@ static inline uint8_t* CurrMonRowData(void) {
     return mon_out_buf + (mon_curr_row * mon_max_cols);
 }
 
-static uint8_t* ScrollMonTxt(void) {
-    if (mon_curr_row == (mon_max_rows - 1)) {
-        mon_top_row = (mon_top_row + 1) % mon_max_rows;
+static inline int NumMonRows(void) {
+    if (mon_init_row > mon_curr_row) {
+        return mon_max_rows - mon_init_row + mon_curr_row + 1;
+    }
+    return mon_curr_row - mon_init_row + 1;
+}
+
+static uint8_t* NextMonRowData(void) {
+    if (NumMonRows() == mon_max_rows) {
+        mon_init_row = (mon_init_row + 1) % mon_max_rows;
     }
     mon_curr_row = (mon_curr_row + 1) % mon_max_rows;
     mon_curr_col = 0;
@@ -93,17 +100,20 @@ static void EmitMonTxt(const char* restrict txt) {
     char c;
     uint8_t* restrict row_data = CurrMonRowData();
     while (n < MAX_CHARS_TO_EMIT && (c = *txt++) != '\0') {
+        if (c == '\n' && mon_curr_col < mon_max_cols) {
+            row_data[mon_curr_col] = 0x00;
+        }
+        if (c == '\n' || mon_curr_col == mon_max_cols) {
+            row_data = NextMonRowData();
+        }
+        if (c != '\n') {
+            row_data[mon_curr_col++] = (uint8_t)c;
+        }
         n++;
-        if (c == '\n') {
-            row_data = ScrollMonTxt();
-            continue;
-        }
-        row_data[mon_curr_col++] = (uint8_t)c;
-        if (mon_curr_col == mon_max_cols) {
-            row_data = ScrollMonTxt();
-        }
     }
-    row_data[mon_curr_col] = 0x00;
+    if (mon_curr_col < mon_max_cols) {
+        row_data[mon_curr_col] = 0x00;
+    }
 #undef MAX_CHARS_TO_EMIT
 }
 
@@ -182,14 +192,19 @@ bool CuSdlMonIoRender(SDL_Surface* restrict screen, CuError* restrict err) {
     const SDL_Color fg_clr = {.r = 0xff, .g = 0xff, .b = 0x4f, .a = 0xff};
     RET_ON_ERR(CuSdlTxtSetColor(&fg_clr, err));
 
-    for (int i = 0; i < mon_max_rows; i++) {
-        const int the_row = (mon_top_row + i) % mon_max_rows;
+    const int num_rows = NumMonRows();
+    for (int i = 0; i < num_rows; i++) {
+        const int the_row = (mon_init_row + i) % mon_max_rows;
         uint8_t* the_txt = mon_out_buf + (the_row * mon_max_cols);
-        const size_t txt_sz = strlen((const char*)the_txt);
-        if (txt_sz == 0U) {
+        if (the_txt[0] == 0x00) {
             continue;
         }
-        if (mon_inp_active && the_row == mon_curr_row) {
+        size_t txt_sz = mon_max_cols;
+        const void* first_nil = memchr(the_txt, 0x00, mon_max_cols);
+        if (first_nil != NULL) {
+            txt_sz = (uint8_t*)first_nil - the_txt;
+        }
+        if (mon_inp_active && the_row == mon_curr_row && txt_sz > 0) {
             the_txt[txt_sz - 1] = mon_show_cursor ? 0xdb : 0x20;
         }
         SDL_Point pos = {.x = 0, .y = i * CuSdlTxtHeight()};
@@ -216,7 +231,7 @@ bool CuSdlMonProcEvt(const SDL_Event* restrict evt, CuError* restrict err) {
       case SDL_KEYUP:
         if (evt->key.keysym.sym == SDLK_RETURN) {
             UnemitMonTxt(1);  // Remove the place-holder for the cursor.
-            ScrollMonTxt();
+            NextMonRowData();
             RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
         } else if (evt->key.keysym.sym == SDLK_BACKSPACE && mon_inp_size > 0) {
             UnemitMonTxt(2);  // Remove the place-holder for the cursor as well.
@@ -225,7 +240,7 @@ bool CuSdlMonProcEvt(const SDL_Event* restrict evt, CuError* restrict err) {
         } else if (evt->key.keysym.sym == SDLK_d &&
           (evt->key.keysym.mod & KMOD_CTRL) != 0) {
             UnemitMonTxt(1);  // Remove the place-holder for the cursor.
-            ScrollMonTxt();
+            NextMonRowData();
             mon_inp_eof = true;
             RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
         }
