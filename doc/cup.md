@@ -33,6 +33,9 @@ Input/output is memory-mapped. The memory-controller in CUS maps I/O devices to
 certain physical memory-addresses such that reads/writes from/to these addresses
 automatically result in communication with the corresponding I/O peripheral.
 
+CUP is a work-in-progress. See the top-level [TODO](../TODO.md) document for
+things yet to be implemented or fixed in CUP.
+
 ## Registers
 
 CUP provides access to 32 general-purpose 32-bit integer registers. These are
@@ -234,21 +237,3 @@ The following table summarizes the load-store instructions:
 | STWD | Store a word into memory. | `M[R[ra] + SgnExt(imm16)] = R[rt]` | I | 13 |
 | STHW | Store a half-word into memory. | `M[R[ra] + SgnExt(imm16)](15:0) = R[rt](15:0)` | I | 14 |
 | STSB | Store a byte into memory. | `M[R[ra] + SgnExt(imm16)](7:0) = R[rt](7:0)` | I | 15 |
-
-## TODOs
-
-To be a bit more realistic, CUP still needs support for a great many things:
-
-*   How to interact with hardware peripherals for input/output.
-*   Raising and handling traps.
-*   Calling-convention for C programs.
-*   User versus supervisor mode and privileged instructions.
-*   Memory-management unit and support for virtual memory.
-*   Floating-point arithmetic.
-*   Simulation of a memory-hierarchy, including appropriate latency-hits.
-*   Multi-core support, including having a well-defined memory-model.
-*   Pipelined execution of instructions.
-*   (Nice to have) Vector instructions for multimedia.
-*   Et cetera.
-
-I plan to add support for these in due course of time.
