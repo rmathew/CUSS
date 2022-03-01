@@ -7,6 +7,7 @@
 #include "SDL_keycode.h"
 #include "SDL_pixels.h"
 #include "SDL_rect.h"
+#include "SDL_stdinc.h"
 #include "SDL_timer.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -29,6 +30,7 @@ static int mon_max_cols = 0;
 static CuMutex mon_inp_mut = NULL;
 static CuCondVar mon_inp_cv = NULL;
 static bool mon_inp_active = false;
+static bool mon_inp_eof = false;
 static bool mon_show_cursor = false;
 
 bool CuSdlMonIoSetUp(int scr_width, int scr_height, CuError* restrict err) {
@@ -46,6 +48,7 @@ bool CuSdlMonIoSetUp(int scr_width, int scr_height, CuError* restrict err) {
     RET_ON_ERR(CuMutCreate(&mon_inp_mut, err));
     RET_ON_ERR(CuCondVarCreate(&mon_inp_cv, err));
     mon_inp_active = false;
+    mon_inp_eof = false;
     mon_show_cursor = false;
     return true;
 }
@@ -67,6 +70,7 @@ void CuSdlMonIoTearDown(void) {
     CuMutDestroy(&mon_inp_mut);
     CuCondVarDestroy(&mon_inp_cv);
     mon_inp_active = false;
+    mon_inp_eof = false;
     mon_show_cursor = false;
 }
 
@@ -122,7 +126,11 @@ static void UnemitMonTxt(size_t n) {
 static uint32_t FlipCursorBlink(uint32_t interval, void* param) {
     (void)param;  // Suppress unused variable warning.
     mon_show_cursor = !mon_show_cursor;
-    return mon_inp_active ? interval : 0U;
+    if (mon_inp_active) {
+        return interval;
+    }
+    CuLogInfo("Cancelling cursor-blink timer-function.");
+    return 0U;
 }
 
 bool CuSdlMonIoGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
@@ -131,6 +139,7 @@ bool CuSdlMonIoGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
     mon_inp_active = true;
     mon_show_cursor = true;
 
+    EmitMonTxt(" ");  // Add a place-holder for the cursor.
 #define CURSOR_BLINK_MS 500
     const SDL_TimerID timer_id = SDL_AddTimer(CURSOR_BLINK_MS, FlipCursorBlink,
       /*param=*/NULL);
@@ -148,10 +157,12 @@ bool CuSdlMonIoGetInp(char* restrict buf, size_t buf_size, bool* restrict eof,
     RET_ON_ERR(CuMutUnlock(&mon_inp_mut, err));
     SDL_StopTextInput();
 
-    SDL_RemoveTimer(timer_id);
+    if (SDL_RemoveTimer(timer_id) == SDL_FALSE) {
+        CuLogWarn("Could not remove cursor-blink timer-function %d.", timer_id);
+    }
     mon_show_cursor = false;
     mon_inp_active = false;
-    *eof = false;
+    *eof = mon_inp_eof;
 
     return true;
 }
@@ -188,19 +199,34 @@ bool CuSdlMonIoRender(SDL_Surface* restrict screen, CuError* restrict err) {
 }
 
 bool CuSdlMonProcEvt(const SDL_Event* restrict evt, CuError* restrict err) {
+    if (!mon_inp_active) {
+        return true;
+    }
+    const size_t mon_inp_size = strlen(mon_inp_buf);
     switch (evt->type) {
       case SDL_TEXTINPUT:
         RET_ON_ERR(CuMutLock(&mon_inp_mut, err));
-        strncat(mon_inp_buf, evt->text.text, MAX_MON_INP - strlen(mon_inp_buf));
+        strncat(mon_inp_buf, evt->text.text, MAX_MON_INP - mon_inp_size);
         RET_ON_ERR(CuMutUnlock(&mon_inp_mut, err));
-        UnemitMonTxt(1);
+        UnemitMonTxt(1);  // Remove the place-holder for the cursor.
         EmitMonTxt(evt->text.text);
-        EmitMonTxt(" ");
+        EmitMonTxt(" ");  // Add a place-holder for the cursor.
         break;
 
       case SDL_KEYUP:
         if (evt->key.keysym.sym == SDLK_RETURN) {
+            UnemitMonTxt(1);  // Remove the place-holder for the cursor.
             ScrollMonTxt();
+            RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
+        } else if (evt->key.keysym.sym == SDLK_BACKSPACE && mon_inp_size > 0) {
+            UnemitMonTxt(2);  // Remove the place-holder for the cursor as well.
+            mon_inp_buf[mon_inp_size - 1] = '\0';
+            EmitMonTxt(" ");  // Add a place-holder for the cursor.
+        } else if (evt->key.keysym.sym == SDLK_d &&
+          (evt->key.keysym.mod & KMOD_CTRL) != 0) {
+            UnemitMonTxt(1);  // Remove the place-holder for the cursor.
+            ScrollMonTxt();
+            mon_inp_eof = true;
             RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
         }
         break;

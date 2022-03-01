@@ -58,12 +58,11 @@ care of.
 
 ### GUI
 
-* Handle backspace in user-input.
-* Handle Ctrl+D in user-input to signify EOF.
-* Fix garbled output on scrolling.
+* Remove the extra column emitted when the output is 80 columns wide.
+* Make scrolling of text work as expected.
 * Fix dangling CUSS on `quit`.
 * Fix dangling CUSS on ESC.
-* Fix lingering cursor visible on previous lines.
+* Only redraw portions of the display that actually need to be redrawn.
 
 ## User-Interface
 
