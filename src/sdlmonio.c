@@ -17,6 +17,7 @@
 #include "logger.h"
 #include "sdltxt.h"
 
+// Maximum size of the command-line (including the terminal '\0').
 #define MAX_MON_INP 256
 
 static char mon_inp_buf[MAX_MON_INP];
@@ -187,9 +188,9 @@ bool CuSdlMonIoPutMsg(const char* restrict msg, CuError* restrict err) {
 
 bool CuSdlMonIoRender(SDL_Surface* restrict screen, CuError* restrict err) {
     SDL_FillRect(screen, /*rect=*/NULL,
-      SDL_MapRGBA(screen->format, 0x00, 0x00, 0x8f, 0xff));
+      SDL_MapRGBA(screen->format, 0x00, 0x5f, 0x87, 0xff));
 
-    const SDL_Color fg_clr = {.r = 0xff, .g = 0xff, .b = 0x4f, .a = 0xff};
+    const SDL_Color fg_clr = {.r = 0xee, .g = 0xee, .b = 0xee, .a = 0xff};
     RET_ON_ERR(CuSdlTxtSetColor(&fg_clr, err));
 
     const int num_rows = NumMonRows();
@@ -220,12 +221,14 @@ bool CuSdlMonProcEvt(const SDL_Event* restrict evt, CuError* restrict err) {
     const size_t mon_inp_size = strlen(mon_inp_buf);
     switch (evt->type) {
       case SDL_TEXTINPUT:
-        RET_ON_ERR(CuMutLock(&mon_inp_mut, err));
-        strncat(mon_inp_buf, evt->text.text, MAX_MON_INP - mon_inp_size);
-        RET_ON_ERR(CuMutUnlock(&mon_inp_mut, err));
-        UnemitMonTxt(1);  // Remove the place-holder for the cursor.
-        EmitMonTxt(evt->text.text);
-        EmitMonTxt(" ");  // Add a place-holder for the cursor.
+        if (mon_inp_size < (MAX_MON_INP - 1)) {
+            RET_ON_ERR(CuMutLock(&mon_inp_mut, err));
+            strncat(mon_inp_buf, evt->text.text, MAX_MON_INP - mon_inp_size);
+            RET_ON_ERR(CuMutUnlock(&mon_inp_mut, err));
+            UnemitMonTxt(1);  // Remove the place-holder for the cursor.
+            EmitMonTxt(evt->text.text);
+            EmitMonTxt(" ");  // Add a place-holder for the cursor.
+        }
         break;
 
       case SDL_KEYUP:
@@ -233,16 +236,20 @@ bool CuSdlMonProcEvt(const SDL_Event* restrict evt, CuError* restrict err) {
             UnemitMonTxt(1);  // Remove the place-holder for the cursor.
             NextMonRowData();
             RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
-        } else if (evt->key.keysym.sym == SDLK_BACKSPACE && mon_inp_size > 0) {
-            UnemitMonTxt(2);  // Remove the place-holder for the cursor as well.
-            mon_inp_buf[mon_inp_size - 1] = '\0';
-            EmitMonTxt(" ");  // Add a place-holder for the cursor.
         } else if (evt->key.keysym.sym == SDLK_d &&
           (evt->key.keysym.mod & KMOD_CTRL) != 0) {
             UnemitMonTxt(1);  // Remove the place-holder for the cursor.
             NextMonRowData();
             mon_inp_eof = true;
             RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
+        }
+        break;
+
+      case SDL_KEYDOWN:
+        if (evt->key.keysym.sym == SDLK_BACKSPACE && mon_inp_size > 0) {
+            UnemitMonTxt(2);  // Remove the place-holder for the cursor as well.
+            mon_inp_buf[mon_inp_size - 1] = '\0';
+            EmitMonTxt(" ");  // Add a place-holder for the cursor.
         }
         break;
     }

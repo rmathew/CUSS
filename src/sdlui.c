@@ -289,14 +289,6 @@ bool CuSdlUiRunEventLoop(CuError* restrict err) {
               case SDL_KEYUP:
                 if (evt.key.keysym.sym == SDLK_ESCAPE) {
                     quit = true;
-                } else if (is_monitor_active) {
-                    RET_ON_ERR(CuSdlMonProcEvt(&evt, err));
-                }
-                break;
-
-              case SDL_TEXTINPUT:
-                if (is_monitor_active) {
-                    RET_ON_ERR(CuSdlMonProcEvt(&evt, err));
                 }
                 break;
 
@@ -305,6 +297,9 @@ bool CuSdlUiRunEventLoop(CuError* restrict err) {
                     quit = true;
                 }
                 break;
+            }
+            if (!quit && is_monitor_active) {
+                RET_ON_ERR(CuSdlMonProcEvt(&evt, err));
             }
         }
     }

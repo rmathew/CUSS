@@ -58,7 +58,6 @@ care of.
 
 ### GUI
 
-* Fix segmentation-fault on too much input.
 * Fix dangling CUSS on `quit`.
 * Fix dangling CUSS on ESC.
 * Only redraw portions of the display that actually need to be redrawn.
