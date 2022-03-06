@@ -58,8 +58,7 @@ care of.
 
 ### GUI
 
-* Fix dangling CUSS on `quit`.
-* Fix dangling CUSS on ESC.
+* Fix dangling CUSS on `quit` command.
 * Only redraw portions of the display that actually need to be redrawn.
 
 ## User-Interface

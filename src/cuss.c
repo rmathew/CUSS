@@ -205,9 +205,9 @@ static bool MonitorSetUp(const CuOptions* restrict opts,
     return true;
 }
 
-static bool MonitorTearDown(CuThread* restrict mon_thr) {
+static bool MonitorTearDown(CuThread* restrict mon_thr, CuError* restrict err) {
     int mon_status;
-    CuThrWait(mon_thr, &mon_status);
+    RET_ON_ERR(CuThrWait(mon_thr, &mon_status, err));
     const bool mon_succ = (mon_status == EXIT_SUCCESS);
     CuLogInfo("Monitor thread finished execution (%s).", mon_succ ? "SUCCESS" :
       "FAILURE");
@@ -235,9 +235,10 @@ static bool ExecutorSetUp(CuThread* restrict exe_thr) {
     return true;
 }
 
-static bool ExecutorTearDown(CuThread* restrict exe_thr) {
+static bool ExecutorTearDown(CuThread* restrict exe_thr,
+  CuError* restrict err) {
     int exe_status;
-    CuThrWait(exe_thr, &exe_status);
+    RET_ON_ERR(CuThrWait(exe_thr, &exe_status, err));
     const bool exe_succ = (exe_status == EXIT_SUCCESS);
     CuLogInfo("Executor thread finished execution (%s).", exe_succ ?
       "SUCCESS" : "FAILURE");
@@ -267,13 +268,13 @@ int main(int argc, char *argv[]) {
     CuThread exe_thr;
     RET_FAIL_ON_ERR(ExecutorSetUp(&exe_thr));
 
+    CuError err;
     if (opts.sdl_ui) {
-        CuError err;
         RET_FAIL_ON_ERR(CuSdlUiRunEventLoop(&err));
-        CuSdlUiTearDown();
+        RET_FAIL_ON_ERR(CuSdlUiTearDown(&err));
     }
 
-    RET_FAIL_ON_ERR(ExecutorTearDown(&exe_thr));
-    RET_FAIL_ON_ERR(MonitorTearDown(&mon_thr));
+    RET_FAIL_ON_ERR(ExecutorTearDown(&exe_thr, &err));
+    RET_FAIL_ON_ERR(MonitorTearDown(&mon_thr, &err));
     return EXIT_SUCCESS;
 }

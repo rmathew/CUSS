@@ -223,11 +223,11 @@ static void PrintRenderTimings(void) {
       (double)sum_flip_ms/(double)num_frames);
 }
 
-bool CuSdlUiTearDown(void) {
+bool CuSdlUiTearDown(CuError* restrict err) {
     PrintRenderTimings();
 
-    CuSdlMonIoTearDown();
-    CuSdlTxtTearDown();
+    RET_ON_ERR(CuSdlMonIoTearDown(err));
+    RET_ON_ERR(CuSdlTxtTearDown(err));
 
     SDL_DestroyTexture(screen_texture);
     SDL_FreeSurface(screen);

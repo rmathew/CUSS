@@ -15,15 +15,16 @@ typedef int (*CuThreadFn)(void* data);
 
 extern bool CuThrCreate(CuThreadFn fn, const char* restrict name,
   void* restrict data, CuThread* restrict thr, CuError* restrict err);
-extern void CuThrWait(CuThread* restrict thr, int* restrict status);
+extern bool CuThrWait(CuThread* restrict thr, int* restrict status,
+  CuError* restrict err);
 
 extern bool CuMutCreate(CuMutex* restrict mut, CuError* restrict err);
-extern void CuMutDestroy(CuMutex* restrict mut);
+extern bool CuMutDestroy(CuMutex* restrict mut, CuError* restrict err);
 extern bool CuMutLock(CuMutex* restrict mut, CuError* restrict err);
 extern bool CuMutUnlock(CuMutex* restrict mut, CuError* restrict err);
 
 extern bool CuCondVarCreate(CuCondVar* restrict cv, CuError* restrict err);
-extern void CuCondVarDestroy(CuCondVar* restrict cv);
+extern bool CuCondVarDestroy(CuCondVar* restrict cv, CuError* restrict err);
 extern bool CuCondVarWait(CuCondVar* restrict cv, CuMutex* restrict mut,
   CuError* restrict err);
 extern bool CuCondVarSignal(CuCondVar* restrict cv, CuError* restrict err);

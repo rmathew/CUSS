@@ -31,7 +31,7 @@ static int mon_max_cols = 0;
 static CuMutex mon_inp_mut = NULL;
 static CuCondVar mon_inp_cv = NULL;
 static bool mon_inp_active = false;
-static bool mon_inp_eof = false;
+static bool mon_inp_eof = true;
 static bool mon_show_cursor = false;
 
 bool CuSdlMonIoSetUp(int scr_width, int scr_height, CuError* restrict err) {
@@ -54,13 +54,29 @@ bool CuSdlMonIoSetUp(int scr_width, int scr_height, CuError* restrict err) {
     return true;
 }
 
-void CuSdlMonIoTearDown(void) {
+bool CuSdlMonIoTearDown(CuError* restrict err) {
+    mon_inp_eof = true;
     if (mon_inp_active) {
-        CuError err;
-        if (!CuCondVarSignal(&mon_inp_cv, &err)) {
-            CuLogWarn("Could not signal Monitor-thread: %s", err.err_msg);
-        }
+        RET_ON_ERR(CuCondVarSignal(&mon_inp_cv, err));
+
+#define MON_THR_WAIT_MS 250
+#define MAX_MON_THR_WAIT_ATTEMPTS 4
+
+        int n = 0;
+        do {
+            SDL_Delay(MON_THR_WAIT_MS);
+            n++;
+        } while (mon_inp_active && n < MAX_MON_THR_WAIT_ATTEMPTS);
+#undef MAX_MON_THR_WAIT_ATTEMPTS
+#undef MON_THR_WAIT_MS
     }
+    if (mon_inp_active) {
+        return CuErrMsg(err, "Timed out waiting for Monitor-thread.");
+    }
+    RET_ON_ERR(CuMutLock(&mon_inp_mut, err));
+    RET_ON_ERR(CuCondVarDestroy(&mon_inp_cv, err));
+    RET_ON_ERR(CuMutUnlock(&mon_inp_mut, err));
+    RET_ON_ERR(CuMutDestroy(&mon_inp_mut, err));
 
     mon_inp_buf[0] = '\0';
     free(mon_out_buf);
@@ -68,11 +84,9 @@ void CuSdlMonIoTearDown(void) {
     mon_curr_row = 0;
     mon_curr_col = 0;
 
-    CuMutDestroy(&mon_inp_mut);
-    CuCondVarDestroy(&mon_inp_cv);
     mon_inp_active = false;
-    mon_inp_eof = false;
     mon_show_cursor = false;
+    return true;
 }
 
 static inline uint8_t* CurrMonRowData(void) {

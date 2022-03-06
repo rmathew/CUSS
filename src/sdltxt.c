@@ -843,11 +843,13 @@ bool CuSdlTxtSetUp(const SDL_PixelFormat* restrict pixel_format,
     return CreateFontSurface(pixel_format, err);
 }
 
-void CuSdlTxtTearDown(void) {
+bool CuSdlTxtTearDown(CuError* restrict err) {
     if (font_surface != NULL) {
         SDL_FreeSurface(font_surface);
     }
     font_surface = NULL;
+    (void)err;  // Suppress an unused parameter warning.
+    return true;
 }
 
 int CuSdlTxtWidth() { return VGA_FONT_WIDTH; }

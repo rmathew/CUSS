@@ -14,7 +14,7 @@
 
 extern bool CuSdlTxtSetUp(const SDL_PixelFormat* restrict pixel_format,
   CuError* restrict err);
-extern void CuSdlTxtTearDown(void);
+extern bool CuSdlTxtTearDown(CuError* restrict err);
 
 extern int CuSdlTxtWidth();
 extern int CuSdlTxtHeight();

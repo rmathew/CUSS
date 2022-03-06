@@ -36,13 +36,15 @@ bool CuThrCreate(CuThreadFn fn, const char* restrict name,
     return true;
 }
 
-void CuThrWait(CuThread* restrict thr, int* restrict status) {
-    if (thr == NULL || *thr == NULL) {
-        return;
+bool CuThrWait(CuThread* restrict thr, int* restrict status,
+  CuError* restrict err) {
+    if (thr == NULL || *thr == NULL || (*thr)->sdl_thr == NULL) {
+        return CuErrMsg(err, "Bad `thr` argument.");
     }
     SDL_WaitThread((*thr)->sdl_thr, status);
     free(*thr);
     *thr = NULL;
+    return true;
 }
 
 bool CuMutCreate(CuMutex* restrict mut, CuError* restrict err) {
@@ -60,17 +62,18 @@ bool CuMutCreate(CuMutex* restrict mut, CuError* restrict err) {
     return true;
 }
 
-void CuMutDestroy(CuMutex* restrict mut) {
-    if (mut == NULL || *mut == NULL) {
-        return;
+bool CuMutDestroy(CuMutex* restrict mut, CuError* restrict err) {
+    if (mut == NULL || *mut == NULL || (*mut)->sdl_mut == NULL) {
+        return CuErrMsg(err, "Bad `mut` argument.");
     }
     SDL_DestroyMutex((*mut)->sdl_mut);
     free(*mut);
     *mut = NULL;
+    return true;
 }
 
 bool CuMutLock(CuMutex* restrict mut, CuError* restrict err) {
-    if (mut == NULL || *mut == NULL) {
+    if (mut == NULL || *mut == NULL || (*mut)->sdl_mut == NULL) {
         return CuErrMsg(err, "Bad `mut` argument.");
     }
     if (SDL_LockMutex((*mut)->sdl_mut) != 0) {
@@ -80,7 +83,7 @@ bool CuMutLock(CuMutex* restrict mut, CuError* restrict err) {
 }
 
 bool CuMutUnlock(CuMutex* restrict mut, CuError* restrict err) {
-    if (mut == NULL || *mut == NULL) {
+    if (mut == NULL || *mut == NULL || (*mut)->sdl_mut == NULL) {
         return CuErrMsg(err, "Bad `mut` argument.");
     }
     if (SDL_UnlockMutex((*mut)->sdl_mut) != 0) {
@@ -105,21 +108,22 @@ bool CuCondVarCreate(CuCondVar* restrict cv, CuError* restrict err) {
     return true;
 }
 
-void CuCondVarDestroy(CuCondVar* restrict cv) {
-    if (cv == NULL || *cv == NULL) {
-        return;
+bool CuCondVarDestroy(CuCondVar* restrict cv, CuError* restrict err) {
+    if (cv == NULL || *cv == NULL || (*cv)->sdl_cond == NULL) {
+        return CuErrMsg(err, "Bad `cv` argument.");
     }
     SDL_DestroyCond((*cv)->sdl_cond);
     free(*cv);
     *cv = NULL;
+    return true;
 }
 
 bool CuCondVarWait(CuCondVar* restrict cv, CuMutex* restrict mut,
   CuError* restrict err) {
-    if (cv == NULL || *cv == NULL) {
+    if (cv == NULL || *cv == NULL || (*cv)->sdl_cond == NULL) {
         return CuErrMsg(err, "Bad `cv` argument.");
     }
-    if (mut == NULL || *mut == NULL) {
+    if (mut == NULL || *mut == NULL || (*mut)->sdl_mut == NULL) {
         return CuErrMsg(err, "Bad `mut` argument.");
     }
     if (SDL_CondWait((*cv)->sdl_cond, (*mut)->sdl_mut) != 0) {
@@ -130,7 +134,7 @@ bool CuCondVarWait(CuCondVar* restrict cv, CuMutex* restrict mut,
 }
 
 bool CuCondVarSignal(CuCondVar* restrict cv, CuError* restrict err) {
-    if (cv == NULL || *cv == NULL) {
+    if (cv == NULL || *cv == NULL || (*cv)->sdl_cond == NULL) {
         return CuErrMsg(err, "Bad `cv` argument.");
     }
     if (SDL_CondSignal((*cv)->sdl_cond) != 0) {

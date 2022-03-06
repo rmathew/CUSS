@@ -9,7 +9,7 @@
 #include "errors.h"
 
 extern bool CuSdlUiSetUp(CuError* restrict err);
-extern bool CuSdlUiTearDown(void);
+extern bool CuSdlUiTearDown(CuError* restrict err);
 
 extern bool CuSdlUiRunEventLoop(CuError* restrict err);
 

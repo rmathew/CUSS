@@ -11,7 +11,7 @@
 
 extern bool CuSdlMonIoSetUp(int scr_width, int scr_height,
   CuError* restrict err);
-extern void CuSdlMonIoTearDown(void);
+extern bool CuSdlMonIoTearDown(CuError* restrict err);
 
 extern bool CuSdlMonIoGetInp(char* restrict buf, size_t buf_size,
   bool* restrict eof, CuError* restrict err);
